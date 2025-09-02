@@ -1,0 +1,13 @@
+{
+  "id2label": {
+    "0": "Improdutivo",
+    "1": "Produtivo"
+  },
+  "label2id": {
+    "Improdutivo": 0,
+    "Produtivo": 1
+  },
+  "num_labels": 2,
+  "model_type": "bert",
+  "task": "text-classification"
+}

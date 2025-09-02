@@ -1,0 +1,35 @@
+{
+  "model_type": "bert",
+  "task": "text-classification",
+  "language": "pt-BR",
+  "license": "mit",
+  "tags": [
+    "text-classification",
+    "productivity",
+    "email",
+    "portuguese",
+    "bert",
+    "pt-br",
+    "email-classification",
+    "productivity-classifier",
+    "fine-tuned"
+  ],
+  "datasets": [
+    "custom"
+  ],
+  "metrics": [
+    "accuracy",
+    "f1",
+    "precision",
+    "recall"
+  ],
+  "pipeline_tag": "text-classification",
+  "library_name": "transformers",
+  "inference": {
+    "max_length": 512,
+    "framework": "pytorch"
+  },
+  "model_cards": [
+    "https://huggingface.co/SEU_USUARIO/email-prod-improd-ptbr-bert"
+  ]
+}

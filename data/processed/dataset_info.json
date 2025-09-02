@@ -1,0 +1,14 @@
+{
+  "total_samples": 5510,
+  "train_samples": 4408,
+  "validation_samples": 551,
+  "test_samples": 551,
+  "labels": [
+    "Improdutivo",
+    "Produtivo"
+  ],
+  "label_distribution": {
+    "Produtivo": 4763,
+    "Improdutivo": 747
+  }
+}

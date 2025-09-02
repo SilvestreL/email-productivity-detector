@@ -1,0 +1,6 @@
+Dataset Balanceado - Método: random_oversampling
+Data: 2025-09-01 16:18:51.103888
+Total de amostras: 1600
+Distribuição das classes:
+  Improdutivo: 800 amostras (50.0%)
+  Produtivo: 800 amostras (50.0%)

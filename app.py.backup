@@ -1,0 +1,537 @@
+import streamlit as st
+import time
+import re
+import io
+import nltk
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    TextClassificationPipeline,
+)
+from functools import lru_cache
+from typing import Dict, Literal, Tuple
+import pdfplumber
+import torch
+
+# Configuração da página
+st.set_page_config(
+    page_title="Email Productivity Classifier",
+    page_icon="📧",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# Constantes
+MODEL_ID = "SEU_USUARIO/email-prod-improd-ptbr-bert"  # Troque pelo seu modelo no Hub
+ID2LABEL = {0: "Improdutivo", 1: "Produtivo"}
+
+
+# Cache do modelo para evitar recarga
+@st.cache_resource(show_spinner=True)
+def get_classifier():
+    """Carrega o modelo fine-tuned para classificação de emails"""
+    try:
+        # Carregar tokenizer e modelo
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID)
+
+        # Configurar dispositivo
+        device = 0 if torch.cuda.is_available() else -1
+
+        # Criar pipeline
+        return TextClassificationPipeline(
+            model=model, tokenizer=tokenizer, return_all_scores=True, device=device
+        )
+    except Exception as e:
+        st.error(f"Erro ao carregar modelo: {e}")
+        st.info("💡 Certifique-se de que o modelo está disponível no Hugging Face Hub")
+        return None
+
+
+# Cache das stopwords em português
+@st.cache_resource(show_spinner=False)
+def load_stopwords_pt():
+    """Carrega stopwords em português"""
+    nltk.download("stopwords", quiet=True)
+    return set(stopwords.words("portuguese"))
+
+
+# Carregar stopwords
+try:
+    from nltk.corpus import stopwords
+
+    STOP_PT = load_stopwords_pt()
+except Exception as e:
+    st.warning(f"Erro ao carregar stopwords: {e}")
+    STOP_PT = set()
+
+
+def preprocess(text: str) -> str:
+    """
+    Pré-processamento NLP para português brasileiro
+
+    Args:
+        text: Texto a ser processado
+
+    Returns:
+        Texto processado
+    """
+    if not text:
+        return ""
+
+    # Normalizar espaços
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Tokenização simples por palavras
+    tokens = re.findall(r"\w+|\S", text, flags=re.UNICODE)
+
+    # Remover stopwords (case-insensitive)
+    tokens = [t for t in tokens if t.lower() not in STOP_PT]
+
+    # Opcional: stemming leve com RSLP
+    # from nltk.stem import RSLPStemmer
+    # stemmer = RSLPStemmer()
+    # tokens = [stemmer.stem(t) if t.isalpha() else t for t in tokens]
+
+    return " ".join(tokens)
+
+
+def read_uploaded_file(uploaded) -> str:
+    """
+    Lê arquivo enviado (.txt ou .pdf)
+
+    Args:
+        uploaded: Arquivo enviado via st.file_uploader
+
+    Returns:
+        Conteúdo do arquivo como string
+    """
+    if uploaded is None:
+        return ""
+
+    try:
+        if uploaded.type == "text/plain":
+            # Arquivo .txt
+            content = uploaded.read()
+            return content.decode("utf-8")
+
+        elif uploaded.type == "application/pdf":
+            # Arquivo .pdf
+            content = uploaded.read()
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                return text
+
+        else:
+            st.error(f"Tipo de arquivo não suportado: {uploaded.type}")
+            return ""
+
+    except Exception as e:
+        st.error(f"Erro ao ler arquivo: {e}")
+        return ""
+
+
+def classify_email(content: str) -> Dict:
+    """
+    Classifica email como Produtivo ou Improdutivo usando modelo fine-tuned
+
+    Args:
+        content: Conteúdo do email
+
+    Returns:
+        Dict com category, confidence, scores e explanation
+    """
+    # Usar apenas o conteúdo
+    text = content.strip()
+
+    # Se vazio, retornar categoria Improdutivo com confiança 0.0
+    if not text:
+        return {
+            "category": "Improdutivo",
+            "confidence": 0.0,
+            "scores": {"Produtivo": 0.0, "Improdutivo": 1.0},
+            "explanation": "Nenhum conteúdo recebido.",
+        }
+
+    # Pré-processar texto
+    processed_text = preprocess(text)
+
+    # Carregar classificador
+    classifier = get_classifier()
+
+    if classifier is None:
+        return {
+            "category": "Erro",
+            "confidence": 0.0,
+            "scores": {"Produtivo": 0.0, "Improdutivo": 0.0},
+            "explanation": "Erro ao carregar modelo.",
+            "processed_text": processed_text,
+            "original_text": text,
+        }
+
+    # Classificar (limitar tamanho do texto)
+    result = classifier(processed_text[:4000])  # Evita textos muito longos
+
+    # Mapear resultados
+    scores = {}
+    for pred in result[0]:
+        label_id = (
+            int(pred["label"].split("_")[-1])
+            if "LABEL" in pred["label"]
+            else int(pred["label"])
+        )
+        label_name = ID2LABEL.get(label_id, pred["label"])
+        scores[label_name] = float(pred["score"])
+
+    # Encontrar categoria com maior score
+    category = max(scores, key=scores.get)
+    confidence = scores[category]
+
+    # Gerar explicação
+    explanation = f"Modelo fine-tuned classificou como {category} com {confidence:.2%}."
+
+    return {
+        "category": category,
+        "confidence": confidence,
+        "scores": scores,
+        "explanation": explanation,
+        "processed_text": processed_text,
+        "original_text": text,
+    }
+
+
+def suggest_reply(
+    category: Literal["Produtivo", "Improdutivo"], tone: str, content: str
+) -> Tuple[str, float, str]:
+    """
+    Sugere resposta baseada em templates (sem IA generativa)
+
+    Args:
+        category: Categoria do email (Produtivo/Improdutivo)
+        tone: Tom da resposta (profissional/amigável/formal)
+        content: Conteúdo original
+
+    Returns:
+        Tuple com (reply, confidence, reasoning)
+    """
+
+    # Templates para Produtivo
+    produtivo_templates = {
+        "profissional": """Prezado(a),
+
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e confirmamos que requer nossa atenção.
+
+Para dar continuidade, precisamos de algumas informações:
+- Qual o prazo esperado para esta demanda?
+- Há algum anexo que deveria acompanhar esta mensagem?
+- Existe alguma prioridade específica?
+
+Atenciosamente,
+Equipe de Atendimento""",
+        "amigável": """Oi!
+
+Obrigado pelo contato! 😊 
+
+Recebemos sua mensagem e vamos dar a atenção necessária.
+
+Para organizarmos melhor, você poderia me informar:
+- Qual o prazo que você tem em mente?
+- Tem algum arquivo para anexar?
+- É algo urgente?
+
+Qualquer dúvida, é só falar!
+
+Abraços!""",
+        "formal": """Exmo(a). Sr(a).,
+
+Agradecemos o contato e informamos que sua comunicação foi recebida e está sendo processada.
+
+Para prosseguirmos adequadamente, solicitamos as seguintes informações:
+- Prazo estimado para conclusão
+- Documentos complementares, se houver
+- Nível de prioridade atribuído
+
+Em breve retornaremos com as informações solicitadas.
+
+Respeitosamente,
+Departamento de Atendimento""",
+    }
+
+    # Templates para Improdutivo
+    improdutivo_templates = {
+        "profissional": """Prezado(a),
+
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e informamos que não requer ação específica de nossa parte.
+
+Agradecemos a comunicação e ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
+
+Atenciosamente,
+Equipe de Comunicação""",
+        "amigável": """Oi!
+
+Obrigado pelo contato! 😊 
+
+Recebemos sua mensagem e entendemos que não precisa de nenhuma ação nossa no momento.
+
+Se precisar de algo específico no futuro, é só falar!
+
+Abraços!""",
+        "formal": """Exmo(a). Sr(a).,
+
+Agradecemos o contato e informamos que sua comunicação foi recebida.
+
+Conforme análise, esta mensagem não requer ação específica de nosso departamento no momento.
+
+Ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
+
+Respeitosamente,
+Departamento de Comunicação""",
+    }
+
+    # Selecionar template baseado na categoria
+    if category == "Produtivo":
+        reply = produtivo_templates.get(tone, produtivo_templates["profissional"])
+        confidence = 0.90
+        reasoning = f"Resposta automática para email {category} com tom {tone} - solicita confirmação de objetivo/prazo/anexos."
+    else:
+        reply = improdutivo_templates.get(tone, improdutivo_templates["profissional"])
+        confidence = 0.95
+        reasoning = f"Resposta automática para email {category} com tom {tone} - agradece e indica que não requer ação."
+
+    return reply, confidence, reasoning
+
+
+# Interface principal
+def main():
+    st.title("📧 Email Productivity Classifier")
+    st.subheader(
+        "Classificação de Emails (Produtivo/Improdutivo) + Resposta Automática"
+    )
+
+    # Instruções de uso
+    st.markdown("### 📋 Como usar (3 passos)")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.info(
+            """
+        **1️⃣ Envie arquivo ou cole texto**
+        - Upload .txt/.pdf ou
+        - Cole o conteúdo do email
+        """
+        )
+
+    with col2:
+        st.info(
+            """
+        **2️⃣ Escolha o tom da resposta**
+        - Profissional
+        - Amigável  
+        - Formal
+        """
+        )
+
+    with col3:
+        st.info(
+            """
+        **3️⃣ Clique em Analisar**
+        - Veja a classificação
+        - Receba resposta sugerida
+        """
+        )
+
+    st.markdown("---")
+
+    # Inputs
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        content = st.text_area(
+            "📄 Conteúdo do Email",
+            height=250,
+            placeholder="Digite o conteúdo do email aqui...",
+            help="Conteúdo completo do email",
+        )
+
+        # Upload de arquivo
+        uploaded = st.file_uploader(
+            "📁 Ou envie um arquivo (.txt ou .pdf)",
+            type=["txt", "pdf"],
+            help="Envie um arquivo .txt ou .pdf para análise",
+        )
+
+    with col2:
+        tone = st.selectbox(
+            "🎭 Tom da Resposta",
+            ["profissional", "amigável", "formal"],
+            index=0,
+            help="Tom da resposta sugerida",
+        )
+
+        st.markdown("### ℹ️ Sobre")
+        st.info(
+            """
+            **Modelo**: BERT PT-BR Fine-tuned  
+            **Método**: Text Classification  
+            **Labels**: Produtivo/Improdutivo  
+            **Cache**: Ativado
+            **NLP**: Stopwords PT-BR
+            """
+        )
+
+    st.markdown("---")
+
+    # Botão de análise
+    if st.button("🔍 Analisar Email", type="primary", use_container_width=True):
+        # Determinar texto final
+        final_content = ""
+
+        if uploaded is not None:
+            # Priorizar arquivo se enviado
+            file_content = read_uploaded_file(uploaded)
+            if file_content:
+                final_content = file_content
+                st.success(f"✅ Arquivo processado: {uploaded.name}")
+        else:
+            # Usar texto colado
+            final_content = content
+
+        if not final_content:
+            st.warning("⚠️ Por favor, digite o conteúdo do email ou envie um arquivo.")
+            return
+
+        # Medir tempo de inferência
+        start_time = time.perf_counter()
+
+        # Classificar email
+        with st.spinner("🤖 Classificando email..."):
+            classification = classify_email(final_content)
+
+        # Medir tempo
+        inference_time = (time.perf_counter() - start_time) * 1000  # ms
+
+        # Gerar resposta sugerida
+        with st.spinner("💬 Gerando resposta..."):
+            reply, reply_confidence, reasoning = suggest_reply(
+                classification["category"], tone, final_content
+            )
+
+        st.markdown("---")
+
+        # Resultados em duas colunas
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.markdown("### 📊 Resumo")
+
+            # Badge da categoria
+            if classification["category"] == "Produtivo":
+                st.success(f"✅ **PRODUTIVO** - {classification['confidence']:.1%}")
+            else:
+                st.error(f"🚨 **IMPRODUTIVO** - {classification['confidence']:.1%}")
+
+            # Confiança
+            st.metric("Confiança", f"{classification['confidence']:.1%}")
+
+            # Tempo de inferência
+            st.metric("Tempo de Inferência", f"{inference_time:.0f}ms")
+
+            # Explicação
+            st.info(f"💡 {classification['explanation']}")
+
+        with col2:
+            st.markdown("### 📈 Detalhes")
+
+            # Scores brutos
+            st.markdown("**Scores Detalhados:**")
+            for label, score in classification["scores"].items():
+                if label == "Produtivo":
+                    st.progress(score, text=f"Produtivo: {score:.1%}")
+                else:
+                    st.progress(score, text=f"Improdutivo: {score:.1%}")
+
+            # Informações técnicas
+            with st.expander("🔧 Informações Técnicas"):
+                st.json(
+                    {
+                        "modelo": MODEL_ID,
+                        "método": "text-classification",
+                        "tempo_inferencia_ms": round(inference_time, 2),
+                        "scores_completos": classification["scores"],
+                        "tamanho_texto_original": len(classification["original_text"]),
+                        "tamanho_texto_processado": len(
+                            classification["processed_text"]
+                        ),
+                    }
+                )
+
+        st.markdown("---")
+
+        # Resposta sugerida
+        st.markdown("### 💬 Resposta Sugerida")
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.text_area(
+                "Resposta Gerada",
+                value=reply,
+                height=200,
+                disabled=True,
+                help="Resposta sugerida baseada na classificação e tom selecionado",
+            )
+
+        with col2:
+            st.metric("Confiança da Resposta", f"{reply_confidence:.1%}")
+            st.caption(f"💭 {reasoning}")
+
+            # Botão para copiar
+            if st.button("📋 Copiar Resposta", use_container_width=True):
+                st.code(reply, language=None)
+                st.success("✅ Resposta copiada! (Use Ctrl+C)")
+
+    st.markdown("---")
+
+    # Rodapé
+    st.markdown("### 📋 Informações")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.info(
+            """
+            **🌐 Plataforma**  
+            Rodando em Hugging Face Spaces  
+            SDK: Streamlit
+            """
+        )
+
+    with col2:
+        st.info(
+            """
+            **🤖 Modelo**  
+            BERT PT-BR Fine-tuned  
+            Text Classification
+            """
+        )
+
+    with col3:
+        st.info(
+            """
+            **⚡ Performance**  
+            Cache ativado  
+            Cold start: ~3-5s
+            """
+        )
+
+    st.caption(
+        "💡 **Dica**: A primeira execução pode levar alguns segundos (cold start). Para modelo multilíngue, altere MODEL_ID no código."
+    )
+
+
+if __name__ == "__main__":
+    main()

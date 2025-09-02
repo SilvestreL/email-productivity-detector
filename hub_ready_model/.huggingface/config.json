@@ -1,0 +1,25 @@
+{
+  "model_type": "bert",
+  "task": "text-classification",
+  "pipeline_tag": "text-classification",
+  "library_name": "transformers",
+  "tags": [
+    "text-classification",
+    "productivity",
+    "email",
+    "portuguese",
+    "bert",
+    "pt-br",
+    "email-classification",
+    "productivity-classifier",
+    "fine-tuned"
+  ],
+  "language": "pt-BR",
+  "license": "mit",
+  "datasets": ["custom"],
+  "metrics": ["accuracy", "f1", "precision", "recall"],
+  "inference": {
+    "max_length": 512,
+    "framework": "pytorch"
+  }
+}
