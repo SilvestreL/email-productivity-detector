@@ -1,0 +1,8 @@
+timestamp,text_preview,prediction,score,confidence
+2025-09-02 11:39:24,oi boa noite feliz aniversario,Produtivo,Produtivo,0.9959160685539246
+2025-09-02 11:44:39,oi boa noite feliz aniversario,Produtivo,Produtivo,0.9959160685539246
+2025-09-02 11:45:38,“🎉 Você foi selecionado para ganhar um cupom de R$500! Clique aqui e resgate agora.”,Improdutivo,Improdutivo,0.7624977827072144
+2025-09-02 11:45:46,"	1.	“Bom dia, poderia confirmar se o relatório financeiro de março já está disponível no sistema?”",Improdutivo,Improdutivo,0.7809597253799438
+2025-09-02 11:45:54,"Bom dia, poderia confirmar se o relatório financeiro de março já está disponível no sistema?",Produtivo,Produtivo,0.7324986457824707
+2025-09-02 11:53:24,	4.	“Participe da nossa pesquisa rápida e concorra a prêmios exclusivos.”,Improdutivo,Improdutivo,0.7785251140594482
+2025-09-02 12:24:32,O que realmente diferencia um junior promissor é a curiosidade implacável.,Improdutivo,Improdutivo,0.572383463382721
