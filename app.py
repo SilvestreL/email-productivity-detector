@@ -183,10 +183,7 @@ h4 {
     background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
 }
 
-.status-neutral {
-    border-left-color: #d97706;
-    background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
-}
+
 
 /* Sidebar styling minimalista */
 .sidebar .sidebar-content {
@@ -294,20 +291,25 @@ h4 {
 
 /* Sidebar customizado - Design minimalista estilo shadcn */
 .sb-title-main {
-    font-weight: 700;
+    font-weight: 800;
     color: #1e293b;
-    font-size: 1.125rem;
-    margin: 0 0 0.75rem 0;
+    font-size: 1.25rem;
+    margin: 0 0 0.5rem 0;
     padding: 0;
+    text-align: center;
+    letter-spacing: -0.025em;
+    text-decoration: underline;
+    text-decoration-color: #1e40af;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
 }
 
 .sb-section {
-    margin: 0.5rem 0;
-    padding: 0.625rem;
-    background: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    margin: 0.25rem 0;
+    padding: 0.625rem 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 .sb-section h4 {
@@ -328,50 +330,55 @@ h4 {
 
 .sb-divider {
     height: 1px;
-    background: #e5e7eb;
+    background: #1e40af;
     margin: 6px 0;
-    opacity: 0.3;
+    opacity: 0.4;
 }
 
 .sb-links {
     display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-    margin-top: 0.375rem;
+    flex-direction: row;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: nowrap;
+    width: 100%;
 }
 
 .sb-link {
-    display: flex;
+    display: flex;`
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
     padding: 0.5rem;
     border-radius: 8px;
     color: #475569;
     text-decoration: none;
     transition: all 0.15s ease-in-out;
-    font-size: 0.8125rem;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: transparent;
+    border: none;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
 }
 
 .sb-link:hover {
-    background: #f8fafc;
+    background: rgba(30, 64, 175, 0.1);
     color: #1e293b;
-    border-color: #d1d5db;
 }
 
 .sb-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
 .sb-icon svg {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     fill: #475569;
 }
 
@@ -383,7 +390,67 @@ h4 {
     font-weight: 500;
     color: inherit;
     line-height: 1;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    height: 14px;
+}
+
+/* Nova seção de links */
+.links-container {
+    display: flex;
+    flex-direction: row;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0.5rem;
+    border-radius: 8px;
+    color: #475569;
+    text-decoration: none;
+    transition: all 0.15s ease-in-out;
+    background: transparent;
+    border: none;
+    min-width: 120px;
+    height: 40px;
+    flex-shrink: 0;
+    gap: 0.5rem;
+}
+
+.link-item:hover {
+    background: rgba(30, 64, 175, 0.1);
+    color: #1e293b;
+}
+
+.link-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.link-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: #475569;
+    transition: fill 0.15s ease-in-out;
+}
+
+.link-item:hover .link-icon svg {
+    fill: #1e293b;
+}
+
+.link-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: inherit;
+    white-space: nowrap;
 }
 
 /* Utilitários */
@@ -461,26 +528,28 @@ def render_sidebar():
         st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
 
         # Seção: Links
-        github_svg = _find_icon_svg("github")
-        linkedin_svg = _find_icon_svg("linkedin")
-        docs_svg = _find_icon_svg("document")
-
         st.markdown('<div class="sb-section">', unsafe_allow_html=True)
         st.markdown("<h4>Links</h4>", unsafe_allow_html=True)
 
-        st.markdown('<div class="sb-links">', unsafe_allow_html=True)
+        # Container para os links lado a lado
+        st.markdown('<div class="links-container">', unsafe_allow_html=True)
+
+        # Link GitHub
+        with open("icons/icons8-github.svg", "r") as f:
+            github_svg = f.read()
         st.markdown(
-            f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener"><div class="sb-icon">{github_svg}</div><span class="sb-label">GitHub</span></a>',
+            f'<a class="link-item" href="https://github.com/lucassilvestreee/email-productivity-detector" target="_blank" rel="noopener" title="GitHub"><span class="link-icon">{github_svg}</span><span class="link-text">GitHub</span></a>',
             unsafe_allow_html=True,
         )
+
+        # Link LinkedIn
+        with open("icons/icons8-linkedin.svg", "r") as f:
+            linkedin_svg = f.read()
         st.markdown(
-            f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener"><div class="sb-icon">{linkedin_svg}</div><span class="sb-label">LinkedIn</span></a>',
+            f'<a class="link-item" href="https://www.linkedin.com/in/lucassilvestreee/" target="_blank" rel="noopener" title="LinkedIn"><span class="link-icon">{linkedin_svg}</span><span class="link-text">LinkedIn</span></a>',
             unsafe_allow_html=True,
         )
-        st.markdown(
-            f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener"><div class="sb-icon">{docs_svg}</div><span class="sb-label">Documentação</span></a>',
-            unsafe_allow_html=True,
-        )
+
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -887,17 +956,11 @@ def classify_email(content: str) -> Dict:
         text, model_category, model_confidence, scores
     )
 
-    # Gerar explicação com informações sobre correção
-    if correction_applied:
-        explanation = f"Modelo DistilBERT classificou como {model_category} ({model_confidence:.1%}), mas foi corrigido para {final_category} baseado no conteúdo."
-    else:
-        explanation = f"Modelo DistilBERT classificou como {final_category} com {model_confidence:.1%} de confiança."
-
-    # Adicionar contexto baseado no tipo de email
+    # Gerar explicação simplificada
     if final_category == "Produtivo":
-        explanation += " Este email requer atenção e ação da nossa equipe."
+        explanation = "Este email requer atenção e ação da nossa equipe."
     else:
-        explanation += " Este email não requer ação específica da nossa equipe."
+        explanation = "Este email não requer ação específica da nossa equipe."
 
     return {
         "category": final_category,
@@ -1028,25 +1091,6 @@ Departamento de Comunicação""",
         confidence = 0.95
         reasoning = f"Email classificado como Improdutivo - nenhuma ação necessária pela nossa equipe com tom {tone}."
 
-    # Sistema de tradução automática para o idioma original
-    if classification_info and classification_info.get("translation_applied"):
-        original_lang = classification_info.get("original_language", "en")
-
-        # Se o email original não estava em inglês, traduzir a resposta de volta
-        if original_lang != "en":
-            try:
-                translated_reply = translate_text(reply, "en", original_lang)
-                if translated_reply != reply:
-                    reply = translated_reply
-                    reasoning += (
-                        f" (Traduzido automaticamente para {original_lang.upper()})"
-                    )
-                    st.info(
-                        f"Resposta traduzida automaticamente para {original_lang.upper()}"
-                    )
-            except Exception as e:
-                st.warning(f"Erro ao traduzir resposta: {e}")
-
     return reply, confidence, reasoning
 
 
@@ -1055,7 +1099,46 @@ def main():
     # Sidebar local com toggle e links
     render_sidebar()
 
-    st.title("Email Productivity Classifier")
+    # Título principal centralizado e destacado
+    st.markdown(
+        """
+        <div style="text-align: center; margin: 2rem 0;">
+            <h1 style="
+                color: #1e40af; 
+                font-size: 2.5rem; 
+                font-weight: 700; 
+                margin-bottom: 0.5rem;
+                text-decoration: underline;
+                text-underline-offset: 8px;
+                text-decoration-thickness: 3px;
+                text-decoration-color: #3b82f6;
+            ">
+                Email Productivity Classifier
+            </h1>
+            <div style="
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                gap: 1rem; 
+                margin-top: 1rem;
+            ">
+                <span style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 0.5rem 1rem;
+                    border-radius: 20px;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                ">
+                    🤖 Powered by IA
+                </span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown("### Sistema de Classificação Inteligente para Emails")
 
     # Instruções de uso em cards
@@ -1115,7 +1198,7 @@ def main():
         "Clique em um exemplo para inserir automaticamente no campo de conteúdo:"
     )
 
-    col_ex1, col_ex2, col_ex3 = st.columns(3)
+    col_ex1, col_ex2 = st.columns(2)
 
     with col_ex1:
         if st.button(
@@ -1156,23 +1239,6 @@ Ah, e não esqueçam que hoje é aniversário da Maria! Parabéns Maria!
 Bom fim de semana para todos!
 Abraços,
 Pedro"""
-            st.rerun()
-
-    with col_ex3:
-        if st.button("Email Neutro", key="ex_neutro", help="Exemplo de email neutro"):
-            st.session_state[
-                "example_email"
-            ] = """Bom dia,
-
-Informo que estarei ausente do escritório amanhã devido a um compromisso médico.
-
-Minhas atividades estão organizadas e não há pendências urgentes.
-
-Retorno na quinta-feira.
-
-Atenciosamente,
-Ana Costa
-Assistente Administrativa"""
             st.rerun()
 
     st.markdown("---")
@@ -1288,186 +1354,92 @@ Assistente Administrativa"""
 
         st.markdown("---")
 
-        # Resultados em duas colunas
-        col1, col2 = st.columns([1, 1])
+        # Resumo da Classificação
+        st.markdown("### Resumo da Classificação")
 
-        with col1:
-            st.markdown("### Resumo da Classificação")
+        # Status da classificação
+        if classification["confidence"] >= 0.8:
+            st.success("Classificação de Alta Confiança")
+        elif classification["confidence"] >= 0.6:
+            st.warning("Classificação de Confiança Média")
+        else:
+            st.error("Classificação de Baixa Confiança")
 
-            # Status da classificação
-            if classification["confidence"] >= 0.8:
-                st.success("Classificação de Alta Confiança")
-            elif classification["confidence"] >= 0.6:
-                st.warning("Classificação de Confiança Média")
-            else:
-                st.error("Classificação de Baixa Confiança")
+        # Badge da categoria
+        category = classification["category"]
+        confidence = classification["confidence"]
 
-            # Badge da categoria
-            category = classification["category"]
-            confidence = classification["confidence"]
-
-            # Determinar cor e estilo baseado na categoria
-            if category == "Produtivo":
-                st.markdown(
-                    f"""
-                <div class="card status-card status-productive">
-                    <div class="card-header">
-                        <h4>PRODUTIVO</h4>
-                    </div>
-                    <div class="card-content">
-                        <p>Confiança: {confidence:.1%}</p>
-                        <p>Requer ação da nossa equipe</p>
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-            elif category == "Improdutivo":
-                st.markdown(
-                    f"""
-                <div class="card status-card status-unproductive">
-                    <div class="card-header">
-                        <h4>IMPRODUTIVO</h4>
-                    </div>
-                    <div class="card-content">
-                        <p>Confiança: {confidence:.1%}</p>
-                        <p>Nenhuma ação necessária</p>
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f"""
-                <div class="card status-card status-neutral">
-                    <div class="card-header">
-                        <h4>{category.upper()}</h4>
-                    </div>
-                    <div class="card-content">
-                        <p>Confiança: {confidence:.1%}</p>
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-
-            # Mostrar se foi corrigido
-            if classification.get("correction_applied"):
-                st.markdown(
-                    f"""
-                <div class="card">
-                    <div class="card-content">
-                        <p><strong>Correção Inteligente Aplicada:</strong> {classification['model_prediction']} → {classification['category']}</p>
-                        <p class="text-muted">Classificação corrigida baseada no conteúdo do texto</p>
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-
-            # Mostrar se tradução foi aplicada
-            if classification.get("translation_applied"):
-                original_lang = classification.get("original_language", "pt")
-                st.markdown(
-                    f"""
-                <div class="card">
-                    <div class="card-content">
-                        <p><strong>Tradução Aplicada:</strong> {original_lang.upper()} → EN</p>
-                        <p class="text-muted">Texto traduzido automaticamente para classificação</p>
-                    </div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-
-            # Métricas
-            col_metric1, col_metric2 = st.columns(2)
-            with col_metric1:
-                st.markdown(
-                    f"""
-                <div class="metric-card">
-                    <div class="metric-value">{classification['confidence']:.1%}</div>
-                    <div class="metric-label">Confiança</div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-
-            with col_metric2:
-                st.markdown(
-                    f"""
-                <div class="metric-card">
-                    <div class="metric-value">{inference_time:.0f}ms</div>
-                    <div class="metric-label">Tempo de Inferência</div>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-
-            # Explicação
+        # Determinar cor e estilo baseado na categoria
+        if category == "Produtivo":
             st.markdown(
                 f"""
-            <div class="card">
+            <div class="card status-card status-productive">
+                <div class="card-header">
+                    <h4>PRODUTIVO</h4>
+                </div>
                 <div class="card-content">
-                    <p>{classification['explanation']}</p>
+                    <p>Confiança: {confidence:.1%}</p>
+                    <p>Requer ação da nossa equipe</p>
+                    <p><strong>Status:</strong> Requer ação da equipe</p>
+                    <p><strong>Prioridade:</strong> Alta</p>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+        elif category == "Improdutivo":
+            st.markdown(
+                f"""
+            <div class="card status-card status-unproductive">
+                <div class="card-header">
+                    <h4>IMPRODUTIVO</h4>
+                </div>
+                <div class="card-content">
+                    <p>Confiança: {confidence:.1%}</p>
+                    <p>Nenhuma ação necessária</p>
+                    <p><strong>Status:</strong> Nenhuma ação necessária</p>
+                    <p><strong>Prioridade:</strong> Baixa</p>
                 </div>
             </div>
             """,
                 unsafe_allow_html=True,
             )
 
-        with col2:
-            st.markdown("### Detalhes")
+        # Métricas
+        col_metric1, col_metric2 = st.columns(2)
+        with col_metric1:
+            st.markdown(
+                f"""
+            <div class="card">
+                <div class="metric-value">{classification['confidence']:.1%}</div>
+                <div class="metric-label">Confiança</div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
 
-            # Scores brutos
-            st.markdown("**Scores Detalhados:**")
-            for label, score in classification["scores"].items():
-                if label == "Produtivo":
-                    st.progress(score, text=f"Produtivo: {score:.1%}")
-                else:
-                    st.progress(score, text=f"Improdutivo: {score:.1%}")
+        with col_metric2:
+            st.markdown(
+                f"""
+            <div class="card">
+                <div class="metric-value">{inference_time:.0f}ms</div>
+                <div class="metric-label">Tempo de Inferência</div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
 
-            # Informações técnicas
-            with st.expander("Informações Técnicas"):
-                tech_info = {
-                    "modelo": "DistilBERT Local (Fine-tuned)",
-                    "método": classification.get("method", "text-classification"),
-                    "tempo_inferencia_ms": round(inference_time, 2),
-                    "scores_completos": classification["scores"],
-                    "tamanho_texto_original": len(classification["original_text"]),
-                    "tamanho_texto_processado": len(classification["processed_text"]),
-                    "modelo_local": MODEL_ID,
-                    "idioma_original": classification.get("original_language", "en"),
-                    "tradução_aplicada": classification.get(
-                        "translation_applied", False
-                    ),
-                }
-
-                # Adicionar informações de tradução se aplicável
-                if classification.get("translation_applied"):
-                    tech_info.update(
-                        {
-                            "texto_traduzido": classification.get(
-                                "translated_text", ""
-                            ),
-                            "direção_tradução": f"{classification.get('original_language', 'pt').upper()} → EN",
-                        }
-                    )
-
-                # Adicionar informações de correção se aplicável
-                if classification.get("correction_applied"):
-                    tech_info.update(
-                        {
-                            "correção_aplicada": True,
-                            "predição_modelo": classification["model_prediction"],
-                            "categoria_final": classification["category"],
-                            "confiança_modelo": classification["model_confidence"],
-                            "método_final": classification["method"],
-                        }
-                    )
-
-                st.json(tech_info)
+        # Explicação
+        st.markdown(
+            f"""
+        <div class="card">
+            <div class="card-content">
+                <p>{classification['explanation']}</p>
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown("---")
 
@@ -1505,11 +1477,6 @@ Assistente Administrativa"""
             )
 
             st.caption(f"{reasoning}")
-
-            # Botão para copiar
-            if st.button("Copiar Resposta", width="content"):
-                st.code(reply, language=None)
-                st.success("Resposta copiada! (Use Ctrl+C)")
 
         st.markdown("---")
 

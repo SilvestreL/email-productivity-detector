@@ -133,6 +133,7 @@ dmypy.json
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -143,16 +144,42 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-# Logs
-logs/
-*.log
+# Docker
+.dockerignore
+docker-compose.override.yml
 
-# Model files (if too large)
-# models/*.joblib
+# Hugging Face
+.huggingface/
+
+# Model checkpoints (keep only final models)
+models/*/checkpoint-*/
+models/test-model/
+
+# Data files
+data/processed/
+data/*.csv
+data/*.txt
+data/*.json
+
+# Scripts (optional - remove if you want to include them)
+scripts/
+
+# Metrics and evaluation
+metrics/
 
 # Temporary files
 *.tmp
 *.temp
+*.log
 
-# Docker
-.dockerignore
+# Streamlit
+.streamlit/
+
+# Keep important files
+!README.md
+!DEPLOY_INSTRUCTIONS.md
+!requirements.txt
+!Dockerfile
+!docker-compose.yml
+!nginx.conf
+!deploy.sh

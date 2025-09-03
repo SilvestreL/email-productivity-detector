@@ -1,21 +1,37 @@
-[theme]
-primaryColor = "#0066cc"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
-
 [server]
+# Configurações do servidor para produção
+port = 7860
+address = "0.0.0.0"
+headless = true
 enableCORS = false
 enableXsrfProtection = false
 
 [browser]
+# Configurações do navegador
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 7860
+
+[theme]
+# Tema personalizado
+primaryColor = "#1e40af"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#1e293b"
+font = "sans serif"
 
 [client]
-showErrorDetails = true
+# Configurações do cliente
+showErrorDetails = false
+toolbarMode = "minimal"
 
 [runner]
+# Configurações do runner
 magicEnabled = false
+installTracer = false
+fixMatplotlib = true
 
 [logger]
+# Configurações de log
 level = "info"
+messageFormat = "%(asctime)s %(message)s"
