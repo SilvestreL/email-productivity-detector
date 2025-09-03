@@ -1122,42 +1122,42 @@ Assistente Administrativa"""
             )
             final_content = final_content[:10000]
 
-            # Medir tempo de inferência
-    start_time = time.perf_counter()
+        # Medir tempo de inferência
+        start_time = time.perf_counter()
 
-    # Classificar email
-    with st.spinner("Classificando email..."):
-        classification = classify_email(final_content)
+        # Classificar email
+        with st.spinner("Classificando email..."):
+            classification = classify_email(final_content)
 
-    # Medir tempo
-    inference_time = (time.perf_counter() - start_time) * 1000  # ms
+        # Medir tempo
+        inference_time = (time.perf_counter() - start_time) * 1000  # ms
 
-    # Log de performance para análise
-    st.info(
-        f"⚡ Performance: Classificação em {inference_time:.0f}ms | Confiança: {classification['confidence']:.1%}"
-    )
-
-    # Gerar resposta sugerida
-    with st.spinner("Gerando resposta..."):
-        reply, reply_confidence, reasoning = suggest_reply(
-            classification["category"], tone, final_content, classification
+        # Log de performance para análise
+        st.info(
+            f"⚡ Performance: Classificação em {inference_time:.0f}ms | Confiança: {classification['confidence']:.1%}"
         )
+
+        # Gerar resposta sugerida
+        with st.spinner("Gerando resposta..."):
+            reply, reply_confidence, reasoning = suggest_reply(
+                classification["category"], tone, final_content, classification
+            )
 
         st.markdown("---")
 
-            # Resultados em duas colunas
-    col1, col2 = st.columns([1, 1])
+        # Resultados em duas colunas
+        col1, col2 = st.columns([1, 1])
 
-    with col1:
-        st.markdown("### 📊 Resumo da Classificação")
-        
-        # Status da classificação
-        if classification["confidence"] >= 0.8:
-            st.success("✅ Classificação de Alta Confiança")
-        elif classification["confidence"] >= 0.6:
-            st.warning("⚠️ Classificação de Confiança Média")
-        else:
-            st.error("❌ Classificação de Baixa Confiança")
+        with col1:
+            st.markdown("### 📊 Resumo da Classificação")
+
+            # Status da classificação
+            if classification["confidence"] >= 0.8:
+                st.success("✅ Classificação de Alta Confiança")
+            elif classification["confidence"] >= 0.6:
+                st.warning("⚠️ Classificação de Confiança Média")
+            else:
+                st.error("❌ Classificação de Baixa Confiança")
 
             # Badge da categoria
             category = classification["category"]
@@ -1344,52 +1344,52 @@ Assistente Administrativa"""
                 st.code(reply, language=None)
                 st.success("Resposta copiada! (Use Ctrl+C)")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # Rodapé
-    st.markdown("### Informações")
+        # Rodapé
+        st.markdown("### Informações")
 
-    col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.markdown(
-            """
-        <div class="card">
-            <h4>Plataforma</h4>
-            <p style="color: #5A6A7A;">Rodando em Hugging Face Spaces</p>
-            <p style="color: #5A6A7A;">SDK: Streamlit</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
+        with col1:
+            st.markdown(
+                """
+            <div class="card">
+                <h4>Plataforma</h4>
+                <p style="color: #5A6A7A;">Rodando em Hugging Face Spaces</p>
+                <p style="color: #5A6A7A;">SDK: Streamlit</p>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col2:
+            st.markdown(
+                """
+            <div class="card">
+                <h4>Modelo</h4>
+                <p style="color: #5A6A7A;">BERT PT-BR Fine-tuned + IA</p>
+                <p style="color: #5A6A7A;">Classificação Inteligente</p>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col3:
+            st.markdown(
+                """
+            <div class="card">
+                <h4>Performance</h4>
+                <p style="color: #5A6A7A;">Cache ativado</p>
+                <p style="color: #5A6A7A;">Cold start: ~3-5s</p>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        st.caption(
+            "**Dica**: A primeira execução pode levar alguns segundos (cold start). Modelo local + classificador inteligente ativado!"
         )
-
-    with col2:
-        st.markdown(
-            """
-        <div class="card">
-            <h4>Modelo</h4>
-            <p style="color: #5A6A7A;">BERT PT-BR Fine-tuned + IA</p>
-            <p style="color: #5A6A7A;">Classificação Inteligente</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    with col3:
-        st.markdown(
-            """
-        <div class="card">
-            <h4>Performance</h4>
-            <p style="color: #5A6A7A;">Cache ativado</p>
-            <p style="color: #5A6A7A;">Cold start: ~3-5s</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    st.caption(
-        "**Dica**: A primeira execução pode levar alguns segundos (cold start). Modelo local + classificador inteligente ativado!"
-    )
 
 
 if __name__ == "__main__":
