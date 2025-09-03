@@ -1,0 +1,82 @@
+# Hugging Face Spaces Configuration
+# This file configures the Space for deployment
+
+[build]
+# Use Docker for containerization
+sdk = "docker"
+
+# Build context
+context = "."
+
+# Dockerfile path (relative to context)
+dockerfile = "Dockerfile"
+
+# Build arguments
+[build.args]
+# Add any build arguments here if needed
+
+# Runtime configuration
+[runtime]
+# Port configuration
+port = 7860
+
+# Environment variables
+[build.environment]
+# Python version
+PYTHON_VERSION = "3.11"
+
+# Streamlit configuration
+STREAMLIT_SERVER_PORT = "7860"
+STREAMLIT_SERVER_ADDRESS = "0.0.0.0"
+
+# Model configuration
+MODEL_PATH = "/app/models/model_distilbert_cased"
+
+# Health check configuration
+HEALTH_CHECK_PATH = "/_stcore/health"
+
+# Resource requirements
+[build.resources]
+# CPU and memory requirements
+cpu = "2"
+memory = "8Gi"
+
+# GPU configuration (optional - uncomment if needed)
+# gpu = "T4"
+
+# Labels for the Space
+[metadata]
+title = "Email Productivity Classifier"
+description = "Sistema inteligente de classificação de emails usando DistilBERT para identificar se uma mensagem é produtiva ou improdutiva"
+tags = ["nlp", "email", "classification", "streamlit", "bert", "portuguese", "productivity"]
+license = "MIT"
+language = "pt"
+sdk_version = "0.0.20"
+space_name = "EmailProductivityClassifier"
+
+# Space settings
+[space]
+# Space type
+type = "app"
+
+# Hardware tier (optional)
+hardware = "cpu-basic"
+
+# Visibility
+visibility = "public"
+
+# Additional configurations
+[build.additional]
+# Build timeout
+timeout = "1800"
+
+# Cache settings
+cache = true
+
+# Security
+[security]
+# Content security policy
+csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+
+# Access control
+public = true
