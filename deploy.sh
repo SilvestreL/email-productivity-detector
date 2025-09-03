@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configurações
-SPACE_NAME="EmailProductivityClassifier"
+SPACE_NAME="email-productivity-classifier"
 USERNAME="silvestrel"  # Seu username do HF
 REGISTRY="registry.hf.space"
 IMAGE_NAME="email-classifier"
