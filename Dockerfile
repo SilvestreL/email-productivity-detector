@@ -22,6 +22,9 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p models data icons
 
+# Download the trained model during build
+RUN python download_model.py
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV STREAMLIT_SERVER_PORT=7860
