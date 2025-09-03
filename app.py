@@ -313,7 +313,7 @@ h4 {
 }
 
 .sb-section {
-    margin-top: 1.5rem;
+    margin-top: 1.25rem;
     padding: 1rem;
     background: #f8fafc;
     border-radius: 8px;
@@ -339,7 +339,7 @@ h4 {
 .sb-links {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
     margin-top: 0.75rem;
 }
 
@@ -347,7 +347,7 @@ h4 {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem;
+    padding: 0.625rem 0.75rem;
     border-radius: 8px;
     color: #475569;
     text-decoration: none;
@@ -356,6 +356,7 @@ h4 {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    min-height: 44px;
 }
 
 .sb-link:hover {
@@ -370,18 +371,18 @@ h4 {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     background: #f1f5f9;
     border-radius: 6px;
-    padding: 0.5rem;
+    padding: 0.375rem;
     border: 1px solid #e2e8f0;
     flex-shrink: 0;
 }
 
 .sb-icon svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     fill: #475569;
 }
 
@@ -397,12 +398,14 @@ h4 {
 .sb-label {
     font-weight: 500;
     color: inherit;
+    line-height: 1;
 }
 
 .sb-divider {
     height: 1px;
     background: #e2e8f0;
     margin: 1rem 0;
+    opacity: 0.6;
 }
 
 /* Utilitários */
