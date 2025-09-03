@@ -1,4 +1,4 @@
-# 📧 Email Productivity Classifier - AutoU
+# 📧 Email Productivity Classifier - 
 
 ## 🎯 **Solução Completa para Classificação de Emails**
 
@@ -251,8 +251,7 @@ docker-compose -f docker-compose.api.yml logs -f
 
 Solução completa e funcional para classificação de emails, desenvolvida especificamente para o teste técnico da **AutoU**.
 
-**✅ Pronto para uso em produção!**
 
 ---
 
-**Desenvolvido com ❤️ para a AutoU**
+
