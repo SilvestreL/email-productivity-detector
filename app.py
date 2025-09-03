@@ -297,13 +297,13 @@ h4 {
     font-weight: 700;
     color: #1e293b;
     font-size: 1.125rem;
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.75rem 0;
     padding: 0;
 }
 
 .sb-section {
-    margin: 0.75rem 0;
-    padding: 0.75rem;
+    margin: 0.5rem 0;
+    padding: 0.625rem;
     background: #ffffff;
     border-radius: 10px;
     border: 1px solid #e5e7eb;
@@ -313,7 +313,7 @@ h4 {
 .sb-section h4 {
     color: #1e293b;
     font-size: 0.875rem;
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.375rem 0;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -329,15 +329,15 @@ h4 {
 .sb-divider {
     height: 1px;
     background: #e5e7eb;
-    margin: 8px 0;
-    opacity: 0.6;
+    margin: 6px 0;
+    opacity: 0.3;
 }
 
 .sb-links {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
 }
 
 .sb-link {
