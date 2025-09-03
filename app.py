@@ -292,91 +292,80 @@ h4 {
     }
 }
 
-/* Sidebar customizado */
-.sb-wrap {
-    padding: 1rem;
-}
-
-.sb-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.sb-title {
+/* Sidebar customizado - Design minimalista estilo shadcn */
+.sb-title-main {
     font-weight: 700;
     color: #1e293b;
-    font-size: 1.25rem;
-    margin: 0;
+    font-size: 1.125rem;
+    margin: 0 0 1rem 0;
+    padding: 0;
 }
 
 .sb-section {
-    margin-top: 1.25rem;
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .sb-section h4 {
     color: #1e293b;
     font-size: 0.875rem;
-    margin: 0 0 0.75rem 0;
+    margin: 0 0 0.5rem 0;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .sb-text {
-    color: #64748b;
-    font-size: 0.875rem;
-    line-height: 1.5;
+    color: #5a6a7a;
+    font-size: 0.8125rem;
+    line-height: 1.4;
     margin: 0;
+}
+
+.sb-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 8px 0;
+    opacity: 0.6;
 }
 
 .sb-links {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
 }
 
 .sb-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
+    gap: 0.5rem;
+    padding: 0.5rem;
     border-radius: 8px;
     color: #475569;
     text-decoration: none;
-    transition: all 0.2s ease-in-out;
-    font-size: 0.875rem;
+    transition: all 0.15s ease-in-out;
+    font-size: 0.8125rem;
     background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    min-height: 44px;
+    border: 1px solid #e5e7eb;
 }
 
 .sb-link:hover {
     background: #f8fafc;
     color: #1e293b;
-    border-color: #cbd5e1;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
+    border-color: #d1d5db;
 }
 
 .sb-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: #f1f5f9;
-    border-radius: 6px;
-    padding: 0.375rem;
-    border: 1px solid #e2e8f0;
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
 }
 
@@ -384,11 +373,6 @@ h4 {
     width: 16px;
     height: 16px;
     fill: #475569;
-}
-
-.sb-link:hover .sb-icon {
-    background: #e2e8f0;
-    border-color: #cbd5e1;
 }
 
 .sb-link:hover .sb-icon svg {
@@ -399,13 +383,7 @@ h4 {
     font-weight: 500;
     color: inherit;
     line-height: 1;
-}
-
-.sb-divider {
-    height: 1px;
-    background: #e2e8f0;
-    margin: 1rem 0;
-    opacity: 0.6;
+    font-size: 0.8125rem;
 }
 
 /* Utilitários */
@@ -450,54 +428,39 @@ ID2LABEL = {0: "Improdutivo", 1: "Produtivo"}  # Voltando ao original
 
 # === Sidebar renderer (UI-ONLY) ===
 def render_sidebar():
-    """UI-ONLY: Renderiza sidebar com toggle, explicação, modelo e links."""
-    # Estado: tema e colapso
-    if "theme" not in st.session_state:
-        st.session_state["theme"] = "light"
-    if "sb_collapsed" not in st.session_state:
-        st.session_state["sb_collapsed"] = False
-
-    collapsed = st.session_state["sb_collapsed"]
-
-    # Botão de toggle no topo da sidebar
+    """UI-ONLY: Renderiza sidebar limpa e minimalista."""
     with st.sidebar:
-        # wrapper com classe condicional
-        wrapper_class = "sb-wrap sb-collapsed" if collapsed else "sb-wrap"
-        st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
+        # Título principal
+        st.markdown(
+            '<div class="sb-title-main">Menu</div>',
+            unsafe_allow_html=True,
+        )
 
-        col_a, col_b = st.columns([1, 1])
-        with col_a:
-            st.markdown(
-                '<div class="sb-header"><span class="sb-title">Menu</span></div>',
-                unsafe_allow_html=True,
-            )
-        with col_b:
-            # Espaço para balancear o layout
-            st.markdown("&nbsp;", unsafe_allow_html=True)
-
-        # === Seção: Sobre a Aplicação ===
+        # Seção: Sobre a Aplicação
         st.markdown('<div class="sb-section">', unsafe_allow_html=True)
         st.markdown("<h4>Sobre a Aplicação</h4>", unsafe_allow_html=True)
         st.markdown(
-            '<p class="sb-text sb-label">Classifica e-mails como <strong>Produtivo</strong> ou <strong>Improdutivo</strong> e sugere respostas com base no conteúdo. Interface simples para análise, histórico e métricas.</p>',
+            '<p class="sb-text">Classifica e-mails como <strong>Produtivo</strong> ou <strong>Improdutivo</strong> e sugere respostas com base no conteúdo.</p>',
             unsafe_allow_html=True,
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # Separador fino
         st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
 
-        # === Seção: Modelo de ML ===
+        # Seção: Modelo de ML
         st.markdown('<div class="sb-section">', unsafe_allow_html=True)
         st.markdown("<h4>Modelo de ML</h4>", unsafe_allow_html=True)
         st.markdown(
-            '<p class="sb-text sb-label">Arquitetura <strong>Deep Learning (BERT)</strong> para classificação de texto, com fine-tuning em dataset rotulado. Métricas (accuracy, precision, recall, f1) disponíveis na interface.</p>',
+            '<p class="sb-text">Arquitetura <strong>Deep Learning (BERT)</strong> para classificação de texto, com fine-tuning em dataset rotulado.</p>',
             unsafe_allow_html=True,
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # Separador fino
         st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
 
-        # === Seção: Links (SVG inline) ===
+        # Seção: Links
         github_svg = _find_icon_svg("github")
         linkedin_svg = _find_icon_svg("linkedin")
         docs_svg = _find_icon_svg("document")
@@ -505,17 +468,20 @@ def render_sidebar():
         st.markdown('<div class="sb-section">', unsafe_allow_html=True)
         st.markdown("<h4>Links</h4>", unsafe_allow_html=True)
 
-        gh_html = f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener" aria-label="GitHub"><div class="sb-icon">{github_svg}</div><span class="sb-label">GitHub</span></a>'
-        li_html = f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener" aria-label="LinkedIn"><div class="sb-icon">{linkedin_svg}</div><span class="sb-label">LinkedIn</span></a>'
-        dc_html = f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener" aria-label="Documentação"><div class="sb-icon">{docs_svg}</div><span class="sb-label">Documentação</span></a>'
-
         st.markdown('<div class="sb-links">', unsafe_allow_html=True)
-        st.markdown(gh_html, unsafe_allow_html=True)
-        st.markdown(li_html, unsafe_allow_html=True)
-        st.markdown(dc_html, unsafe_allow_html=True)
+        st.markdown(
+            f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener"><div class="sb-icon">{github_svg}</div><span class="sb-label">GitHub</span></a>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener"><div class="sb-icon">{linkedin_svg}</div><span class="sb-label">LinkedIn</span></a>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener"><div class="sb-icon">{docs_svg}</div><span class="sb-label">Documentação</span></a>',
+            unsafe_allow_html=True,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
-
-        # fecha wrapper
         st.markdown("</div>", unsafe_allow_html=True)
 
 
