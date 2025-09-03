@@ -48,146 +48,235 @@ def _find_icon_svg(name: str) -> str:
 # Configuração da página
 st.set_page_config(
     page_title="Email Productivity Classifier",
-    page_icon="📧",  # UI-ONLY: manter ícone para identificação da aba
+    page_icon="📧",
     layout="wide",
-    initial_sidebar_state="expanded",  # UI-ONLY: começar com sidebar expandida
+    initial_sidebar_state="expanded",
 )
 
-# CSS customizado para UI profissional
+# CSS customizado para UI profissional e minimalista
 st.markdown(
     """
 <style>
 /* Reset e configurações base */
 .main .block-container {
     max-width: 1200px;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
 }
 
 /* Ocultar elementos decorativos do Streamlit */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-/* Removido: header {visibility: hidden;} para permitir toggle do sidebar */
 
 /* Tipografia profissional */
 h1 {
-    color: #2E3A46 !important;
-    font-size: 32px !important;
+    color: #1e293b !important;
+    font-size: 2.25rem !important;
     font-weight: 700 !important;
     margin-bottom: 1rem !important;
+    letter-spacing: -0.025em !important;
 }
 
 h2 {
-    color: #2E3A46 !important;
-    font-size: 24px !important;
+    color: #1e293b !important;
+    font-size: 1.875rem !important;
     font-weight: 600 !important;
     margin-bottom: 0.75rem !important;
+    letter-spacing: -0.025em !important;
 }
 
 h3 {
-    color: #2E3A46 !important;
-    font-size: 20px !important;
+    color: #1e293b !important;
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    letter-spacing: -0.025em !important;
+}
+
+h4 {
+    color: #1e293b !important;
+    font-size: 1.25rem !important;
     font-weight: 600 !important;
     margin-bottom: 0.5rem !important;
 }
 
-/* Cards e containers */
+/* Sistema de cards elegante */
 .card {
-    background: #F8F9FA;
-    border: 1px solid #EAEAEA;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 1.5rem;
     margin: 1rem 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: all 0.2s ease-in-out;
 }
 
+.card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.card-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    margin: -1.5rem -1.5rem 1rem -1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: 12px 12px 0 0;
+}
+
+.card-header h4 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.card-content {
+    color: #475569;
+    line-height: 1.6;
+}
+
+/* Cards de métricas */
 .metric-card {
-    background: #FFFFFF;
-    border: 1px solid #EAEAEA;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 10px;
     padding: 1.25rem;
     text-align: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.metric-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
 }
 
 .metric-value {
-    color: #1A3A6E !important;
-    font-size: 24px !important;
-    font-weight: 600 !important;
+    color: #1e40af !important;
+    font-size: 1.875rem !important;
+    font-weight: 700 !important;
     margin-bottom: 0.5rem !important;
 }
 
 .metric-label {
-    color: #5A6A7A !important;
-    font-size: 14px !important;
+    color: #64748b !important;
+    font-size: 0.875rem !important;
     font-weight: 500 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-/* Sidebar styling */
+/* Cards de status */
+.status-card {
+    border-left: 4px solid;
+    padding-left: 1.25rem;
+}
+
+.status-productive {
+    border-left-color: #059669;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.status-unproductive {
+    border-left-color: #dc2626;
+    background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.status-neutral {
+    border-left-color: #d97706;
+    background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+}
+
+/* Sidebar styling minimalista */
 .sidebar .sidebar-content {
-    border-right: 1px solid #EAEAEA;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+}
+
+.sidebar .sidebar-content .block-container {
+    padding: 1rem;
 }
 
 /* Botões e inputs */
 .stButton > button {
-    background-color: #1A3A6E !important;
-    border-color: #1A3A6E !important;
+    background-color: #1e40af !important;
+    border-color: #1e40af !important;
     color: white !important;
     border-radius: 8px !important;
     font-weight: 500 !important;
-    padding: 0.5rem 1rem !important;
+    padding: 0.75rem 1.5rem !important;
+    transition: all 0.2s ease-in-out !important;
+    border: none !important;
 }
 
 .stButton > button:hover {
-    background-color: rgba(26,58,110,0.9) !important;
-    border-color: rgba(26,58,110,0.9) !important;
+    background-color: #1e3a8a !important;
+    border-color: #1e3a8a !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.stButton > button:active {
+    transform: translateY(0) !important;
 }
 
 .stSelectbox > div > div > select {
-    border-color: #EAEAEA !important;
-    border-radius: 6px !important;
+    border-color: #e2e8f0 !important;
+    border-radius: 8px !important;
+    border-width: 1px !important;
+    padding: 0.5rem !important;
+    font-size: 0.875rem !important;
 }
 
 .stTextArea > div > div > textarea {
-    border-color: #EAEAEA !important;
-    border-radius: 6px !important;
-}
-
-/* Links e navegação */
-.link {
-    color: #1A3A6E !important;
-    text-decoration: underline !important;
-    cursor: pointer !important;
-}
-
-.link:hover {
-    background-color: rgba(26,58,110,0.08) !important;
-    text-decoration: none !important;
+    border-color: #e2e8f0 !important;
+    border-radius: 8px !important;
+    border-width: 1px !important;
+    padding: 0.75rem !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
 }
 
 /* Tabelas */
 .dataframe {
-    border: 1px solid #EAEAEA !important;
+    border: 1px solid #e2e8f0 !important;
     border-radius: 8px !important;
+    overflow: hidden;
 }
 
 /* Progress bars */
 .stProgress > div > div > div > div {
-    background-color: #1A3A6E !important;
+    background-color: #1e40af !important;
+    border-radius: 4px !important;
 }
 
-/* Info boxes */
+/* Info boxes e alerts */
 .stAlert {
-    border: 1px solid #EAEAEA !important;
+    border: 1px solid #e2e8f0 !important;
     border-radius: 8px !important;
-    background-color: #F8F9FA !important;
+    background-color: #f8fafc !important;
 }
 
 /* Expanders */
 .streamlit-expanderHeader {
-    background-color: #F8F9FA !important;
-    border: 1px solid #EAEAEA !important;
-    border-radius: 6px !important;
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+}
+
+/* Links e navegação */
+.link {
+    color: #1e40af !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: color 0.2s ease-in-out !important;
+}
+
+.link:hover {
+    color: #1e3a8a !important;
+    text-decoration: underline !important;
 }
 
 /* Responsividade */
@@ -196,41 +285,121 @@ h3 {
         padding-left: 1rem;
         padding-right: 1rem;
     }
+    
+    .card {
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
 }
 
-/* === Sidebar (UI-ONLY) === */
-section[data-testid="stSidebar"]{
-    background:#FFFFFF;
-    border-right:1px solid #EAEAEA;
+/* Sidebar customizado */
+.sb-wrap {
+    padding: 1rem;
 }
 
-/* Garantir que o botão de toggle do sidebar seja visível */
-button[data-testid="baseButton-secondary"] {
-    visibility: visible !important;
-    display: block !important;
+.sb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
 }
 
+.sb-title {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 1.25rem;
+    margin: 0;
+}
 
-.sb-wrap{ padding:12px 10px; }
-.sb-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.sb-title{ font-weight:700; color:#2E3A46; font-size:15px; margin:0; }
-.sb-toggle{ border:1px solid #EAEAEA; border-radius:8px; padding:6px 10px; cursor:pointer; background:#FFFFFF; }
-.sb-section{ margin-top:14px; }
-.sb-section h4{ color:#2E3A46; font-size:14px; margin:0 0 8px 0; }
-.sb-text{ color:#5A6A7A; font-size:13px; line-height:1.45; margin:0; }
-.sb-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
-.sb-link{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; color:#2E3A46; text-decoration:none; }
-.sb-link:hover{ background:rgba(26,58,110,0.08); }
-.sb-icon{ display:inline-flex; width:18px; height:18px; }
-.sb-label{ display:inline-block; }
-.sb-divider{ height:1px; background:#EAEAEA; margin:12px 0; }
-/* collapsed */
-.sb-collapsed .sb-label{ display:none; }
-.sb-collapsed section[data-testid="stSidebar"]{ width:74px !important; }
-/* dark theme */
-.theme-dark section[data-testid="stSidebar"]{ background:#0F1A2B; border-right:1px solid #1E2A3C; }
-.theme-dark .sb-title, .theme-dark .sb-text, .theme-dark .sb-link{ color:#E6EAF0; }
-.theme-dark .sb-link:hover{ background:#142544; }
+.sb-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.sb-section h4 {
+    color: #1e293b;
+    font-size: 0.875rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sb-text {
+    color: #64748b;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.sb-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.sb-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    color: #475569;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    font-size: 0.875rem;
+}
+
+.sb-link:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.sb-icon {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+}
+
+.sb-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 1rem 0;
+}
+
+/* Utilitários */
+.text-muted {
+    color: #64748b !important;
+}
+
+.text-primary {
+    color: #1e40af !important;
+}
+
+.text-success {
+    color: #059669 !important;
+}
+
+.text-warning {
+    color: #d97706 !important;
+}
+
+.text-danger {
+    color: #dc2626 !important;
+}
+
+.bg-muted {
+    background-color: #f8fafc !important;
+}
+
+.border-muted {
+    border-color: #e2e8f0 !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -337,7 +506,7 @@ def get_translation_models():
 
         return TRANSLATION_CACHE
     except Exception as e:
-        st.warning(f"⚠️ Erro ao carregar modelos de tradução: {e}")
+        st.warning(f"Erro ao carregar modelos de tradução: {e}")
         return None
 
 
@@ -382,7 +551,7 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
         return translated_text
 
     except Exception as e:
-        st.warning(f"⚠️ Erro na tradução: {e}")
+        st.warning(f"Erro na tradução: {e}")
         return text  # Retornar texto original em caso de erro
 
 
@@ -436,7 +605,7 @@ def get_classifier():
     except Exception as e:
         st.error(f"Erro ao carregar modelo: {e}")
         st.info(
-            "💡 Certifique-se de que o modelo está disponível em models/bert_prod_improd"
+            "Certifique-se de que o modelo está disponível em models/bert_prod_improd"
         )
         return None
 
@@ -571,9 +740,6 @@ def apply_intelligent_correction(
         "meme",
         "whatsapp",
         "engraçado",
-        "😂",
-        "😊",
-        "😄",
         "parabéns",
         "aniversário",
         "felicidades",
@@ -682,7 +848,7 @@ def classify_email(content: str) -> Dict:
     # Log da tradução se aplicada
     if translation_applied:
         st.info(
-            f"🌐 Texto traduzido de {original_lang.upper()} → EN: {translated_text[:100]}..."
+            f"Texto traduzido de {original_lang.upper()} → EN: {translated_text[:100]}..."
         )
 
     # Carregar classificador DistilBERT
@@ -783,7 +949,7 @@ Atenciosamente,
 Equipe de Atendimento""",
         "amigável": """Oi!
 
-Obrigado pelo contato! 😊 
+Obrigado pelo contato!
 
 Recebemos sua mensagem e confirmamos que **requer nossa atenção e ação**.
 
@@ -827,7 +993,7 @@ Atenciosamente,
 Equipe de Comunicação""",
         "amigável": """Oi!
 
-Obrigado pelo contato! 😊 
+Obrigado pelo contato!
 
 Recebemos sua mensagem e informamos que **não precisa de nenhuma ação nossa no momento**.
 
@@ -874,34 +1040,36 @@ Departamento de Comunicação""",
                         f" (Traduzido automaticamente para {original_lang.upper()})"
                     )
                     st.info(
-                        f"🌐 Resposta traduzida automaticamente para {original_lang.upper()}"
+                        f"Resposta traduzida automaticamente para {original_lang.upper()}"
                     )
             except Exception as e:
-                st.warning(f"⚠️ Erro ao traduzir resposta: {e}")
+                st.warning(f"Erro ao traduzir resposta: {e}")
 
     return reply, confidence, reasoning
 
 
 # Interface principal
 def main():
-    # UI-ONLY: Sidebar local com toggle e links
+    # Sidebar local com toggle e links
     render_sidebar()
 
     st.title("Email Productivity Classifier")
-    st.subheader(
-        "Classificação Multilíngue com DistilBERT + Correção Inteligente - Sistema Híbrido"
-    )
+    st.markdown("### Sistema de Classificação Inteligente para Emails")
 
-    # Instruções de uso
-    st.markdown("### Como usar (3 passos)")
+    # Instruções de uso em cards
+    st.markdown("### Como usar")
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown(
             """
         <div class="card">
-            <h4>1. Envie arquivo ou cole texto</h4>
-            <p style="color: #5A6A7A;">Upload .txt/.pdf ou cole o conteúdo do email (PT/EN)</p>
+            <div class="card-header">
+                <h4>1. Conteúdo</h4>
+            </div>
+            <div class="card-content">
+                <p>Cole o texto do email ou envie um arquivo .txt/.pdf</p>
+            </div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -911,8 +1079,12 @@ def main():
         st.markdown(
             """
         <div class="card">
-            <h4>2. Escolha o tom da resposta</h4>
-            <p style="color: #5A6A7A;">Profissional, Amigável ou Formal</p>
+            <div class="card-header">
+                <h4>2. Tom</h4>
+            </div>
+            <div class="card-content">
+                <p>Escolha o tom da resposta: Profissional, Amigável ou Formal</p>
+            </div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -922,8 +1094,12 @@ def main():
         st.markdown(
             """
         <div class="card">
-            <h4>3. Clique em Analisar</h4>
-            <p style="color: #5A6A7A;">Veja classificação multilíngue e receba resposta no idioma original</p>
+            <div class="card-header">
+                <h4>3. Análise</h4>
+            </div>
+            <div class="card-content">
+                <p>Clique em Analisar para obter a classificação e resposta sugerida</p>
+            </div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -932,7 +1108,7 @@ def main():
     st.markdown("---")
 
     # Exemplos de emails para teste
-    st.markdown("### 📧 Exemplos para Teste")
+    st.markdown("### Exemplos para Teste")
     st.markdown(
         "Clique em um exemplo para inserir automaticamente no campo de conteúdo:"
     )
@@ -941,7 +1117,7 @@ def main():
 
     with col_ex1:
         if st.button(
-            "📈 Email Produtivo", key="ex_prod", help="Exemplo de email produtivo"
+            "Email Produtivo", key="ex_prod", help="Exemplo de email produtivo"
         ):
             st.session_state[
                 "example_email"
@@ -963,17 +1139,17 @@ Gerente de Projetos"""
 
     with col_ex2:
         if st.button(
-            "📉 Email Improdutivo", key="ex_improd", help="Exemplo de email improdutivo"
+            "Email Improdutivo", key="ex_improd", help="Exemplo de email improdutivo"
         ):
             st.session_state[
                 "example_email"
             ] = """Oi pessoal!
 
-Como estão? Espero que estejam todos bem! 😊
+Como estão? Espero que estejam todos bem!
 
-Só passando para dar um oi e ver se vocês viram aquele meme que enviei no grupo do WhatsApp ontem? Muito engraçado, né? 😂
+Só passando para dar um oi e ver se vocês viram aquele meme que enviei no grupo do WhatsApp ontem? Muito engraçado, né?
 
-Ah, e não esqueçam que hoje é aniversário da Maria! Parabéns Maria! 🎉🎂🎈
+Ah, e não esqueçam que hoje é aniversário da Maria! Parabéns Maria!
 
 Bom fim de semana para todos!
 Abraços,
@@ -981,9 +1157,7 @@ Pedro"""
             st.rerun()
 
     with col_ex3:
-        if st.button(
-            "📋 Email Neutro", key="ex_neutro", help="Exemplo de email neutro"
-        ):
+        if st.button("Email Neutro", key="ex_neutro", help="Exemplo de email neutro"):
             st.session_state[
                 "example_email"
             ] = """Bom dia,
@@ -1026,7 +1200,7 @@ Assistente Administrativa"""
 
         # Botão para limpar exemplo
         if st.button(
-            "🗑️ Limpar Exemplo", key="clear_example", help="Limpa o campo de conteúdo"
+            "Limpar Exemplo", key="clear_example", help="Limpa o campo de conteúdo"
         ):
             st.session_state["example_email"] = ""
             st.rerun()
@@ -1043,12 +1217,13 @@ Assistente Administrativa"""
         st.markdown(
             """
         <div class="card">
-            <p><strong>Modelo:</strong> DistilBERT Fine-tuned + Correção Inteligente</p>
-            <p><strong>Método:</strong> Sistema Híbrido (Neural + Regras)</p>
-            <p><strong>Categorias:</strong> Produtivo/Improdutivo</p>
-            <p><strong>Idiomas:</strong> Multilíngue (PT/EN + Tradução Automática)</p>
-            <p><strong>Cache:</strong> Ativado</p>
-            <p><strong>Performance:</strong> Inferência Rápida + Correção Automática</p>
+            <div class="card-content">
+                <p><strong>Modelo:</strong> DistilBERT Fine-tuned</p>
+                <p><strong>Método:</strong> Sistema Híbrido</p>
+                <p><strong>Categorias:</strong> Produtivo/Improdutivo</p>
+                <p><strong>Idiomas:</strong> Multilíngue</p>
+                <p><strong>Cache:</strong> Ativado</p>
+            </div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -1057,9 +1232,7 @@ Assistente Administrativa"""
     st.markdown("---")
 
     # Botão de análise
-    if st.button(
-        "Analisar Email", type="primary", width="stretch"
-    ):  # UI-ONLY: troca use_container_width por width='stretch'
+    if st.button("Analisar Email", type="primary", width="stretch"):
         # Determinar texto final
         final_content = ""
 
@@ -1102,7 +1275,7 @@ Assistente Administrativa"""
 
         # Log de performance para análise
         st.info(
-            f"⚡ Performance: Classificação em {inference_time:.0f}ms | Confiança: {classification['confidence']:.1%}"
+            f"Performance: Classificação em {inference_time:.0f}ms | Confiança: {classification['confidence']:.1%}"
         )
 
         # Gerar resposta sugerida
@@ -1117,58 +1290,32 @@ Assistente Administrativa"""
         col1, col2 = st.columns([1, 1])
 
         with col1:
-            st.markdown("### 📊 Resumo da Classificação")
+            st.markdown("### Resumo da Classificação")
 
             # Status da classificação
             if classification["confidence"] >= 0.8:
-                st.success("✅ Classificação de Alta Confiança")
+                st.success("Classificação de Alta Confiança")
             elif classification["confidence"] >= 0.6:
-                st.warning("⚠️ Classificação de Confiança Média")
+                st.warning("Classificação de Confiança Média")
             else:
-                st.error("❌ Classificação de Baixa Confiança")
+                st.error("Classificação de Baixa Confiança")
 
             # Badge da categoria
             category = classification["category"]
             confidence = classification["confidence"]
 
             # Determinar cor e estilo baseado na categoria
-            if category in [
-                "aniversario_parabens",
-                "agradecimento",
-                "informacao_geral",
-                "feriado_datas_especiais",
-                "saudacoes_sociais",
-            ]:
+            if category == "Produtivo":
                 st.markdown(
                     f"""
-                <div class="card" style="border-left: 4px solid #1A3A6E;">
-                    <h4 style="color: #1A3A6E; margin: 0;">{category.upper().replace('_', ' ')}</h4>
-                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-            elif category in [
-                "solicitacao_acao",
-                "problema_urgencia",
-                "lembrete_agendamento",
-            ]:
-                st.markdown(
-                    f"""
-                <div class="card" style="border-left: 4px solid #2E7D32;">
-                    <h4 style="color: #2E7D32; margin: 0;">{category.upper().replace('_', ' ')}</h4>
-                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
-                </div>
-                """,
-                    unsafe_allow_html=True,
-                )
-            elif category == "Produtivo":
-                st.markdown(
-                    f"""
-                <div class="card" style="border-left: 4px solid #2E7D32;">
-                    <h4 style="color: #2E7D32; margin: 0;">📈 PRODUTIVO</h4>
-                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
-                    <p style="color: #2E7D32; margin: 0.5rem 0 0 0; font-weight: 600;">✅ Requer ação da nossa equipe</p>
+                <div class="card status-card status-productive">
+                    <div class="card-header">
+                        <h4>PRODUTIVO</h4>
+                    </div>
+                    <div class="card-content">
+                        <p>Confiança: {confidence:.1%}</p>
+                        <p>Requer ação da nossa equipe</p>
+                    </div>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1176,10 +1323,14 @@ Assistente Administrativa"""
             elif category == "Improdutivo":
                 st.markdown(
                     f"""
-                <div class="card" style="border-left: 4px solid #D32F2F;">
-                    <h4 style="color: #D32F2F; margin: 0;">📉 IMPRODUTIVO</h4>
-                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
-                    <p style="color: #D32F2F; margin: 0.5rem 0 0 0; font-weight: 600;">❌ Nenhuma ação necessária</p>
+                <div class="card status-card status-unproductive">
+                    <div class="card-header">
+                        <h4>IMPRODUTIVO</h4>
+                    </div>
+                    <div class="card-content">
+                        <p>Confiança: {confidence:.1%}</p>
+                        <p>Nenhuma ação necessária</p>
+                    </div>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1187,9 +1338,13 @@ Assistente Administrativa"""
             else:
                 st.markdown(
                     f"""
-                <div class="card" style="border-left: 4px solid #FF9800;">
-                    <h4 style="color: #FF9800; margin: 0;">{category.upper()}</h4>
-                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                <div class="card status-card status-neutral">
+                    <div class="card-header">
+                        <h4>{category.upper()}</h4>
+                    </div>
+                    <div class="card-content">
+                        <p>Confiança: {confidence:.1%}</p>
+                    </div>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1199,9 +1354,11 @@ Assistente Administrativa"""
             if classification.get("correction_applied"):
                 st.markdown(
                     f"""
-                <div class="card" style="background-color: rgba(255,193,7,0.05); border-left: 4px solid #FFC107;">
-                    <p style="color: #856404; margin: 0;"><strong>🔧 Correção Inteligente Aplicada:</strong> {classification['model_prediction']} → {classification['category']}</p>
-                    <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">Classificação corrigida baseada no conteúdo do texto</p>
+                <div class="card">
+                    <div class="card-content">
+                        <p><strong>Correção Inteligente Aplicada:</strong> {classification['model_prediction']} → {classification['category']}</p>
+                        <p class="text-muted">Classificação corrigida baseada no conteúdo do texto</p>
+                    </div>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1212,9 +1369,11 @@ Assistente Administrativa"""
                 original_lang = classification.get("original_language", "pt")
                 st.markdown(
                     f"""
-                <div class="card" style="background-color: rgba(76,175,80,0.05); border-left: 4px solid #4CAF50;">
-                    <p style="color: #4CAF50; margin: 0;"><strong>🌐 Tradução Aplicada:</strong> {original_lang.upper()} → EN</p>
-                    <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">Texto traduzido automaticamente para classificação</p>
+                <div class="card">
+                    <div class="card-content">
+                        <p><strong>Tradução Aplicada:</strong> {original_lang.upper()} → EN</p>
+                        <p class="text-muted">Texto traduzido automaticamente para classificação</p>
+                    </div>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1248,7 +1407,9 @@ Assistente Administrativa"""
             st.markdown(
                 f"""
             <div class="card">
-                <p style="color: #5A6A7A; margin: 0;">{classification['explanation']}</p>
+                <div class="card-content">
+                    <p>{classification['explanation']}</p>
+                </div>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -1268,7 +1429,7 @@ Assistente Administrativa"""
             # Informações técnicas
             with st.expander("Informações Técnicas"):
                 tech_info = {
-                    "modelo": "DistilBERT Local (Fine-tuned) - 100% Acurácia",
+                    "modelo": "DistilBERT Local (Fine-tuned)",
                     "método": classification.get("method", "text-classification"),
                     "tempo_inferencia_ms": round(inference_time, 2),
                     "scores_completos": classification["scores"],
@@ -1303,14 +1464,6 @@ Assistente Administrativa"""
                             "método_final": classification["method"],
                         }
                     )
-                    tech_info.update(
-                        {
-                            "correcao_aplicada": True,
-                            "predicao_bert": classification["bert_prediction"],
-                            "categoria_final": classification["smart_category"],
-                            "metodo_final": classification["method"],
-                        }
-                    )
 
                 st.json(tech_info)
 
@@ -1322,12 +1475,20 @@ Assistente Administrativa"""
         col1, col2 = st.columns([3, 1])
 
         with col1:
-            st.text_area(
-                "Resposta Gerada",
-                value=reply,
-                height=200,
-                disabled=True,
-                help="Resposta sugerida baseada na classificação e tom selecionado",
+            st.markdown(
+                f"""
+            <div class="card">
+                <div class="card-header">
+                    <h4>Resposta Gerada</h4>
+                </div>
+                <div class="card-content">
+                    <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8fafc; padding: 1rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        {reply}
+                    </div>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
             )
 
         with col2:
@@ -1344,9 +1505,7 @@ Assistente Administrativa"""
             st.caption(f"{reasoning}")
 
             # Botão para copiar
-            if st.button(
-                "Copiar Resposta", width="content"
-            ):  # UI-ONLY: width fixo para botão
+            if st.button("Copiar Resposta", width="content"):
                 st.code(reply, language=None)
                 st.success("Resposta copiada! (Use Ctrl+C)")
 
@@ -1361,9 +1520,13 @@ Assistente Administrativa"""
             st.markdown(
                 """
             <div class="card">
-                <h4>Plataforma</h4>
-                <p style="color: #5A6A7A;">Rodando em Hugging Face Spaces</p>
-                <p style="color: #5A6A7A;">SDK: Streamlit</p>
+                <div class="card-header">
+                    <h4>Plataforma</h4>
+                </div>
+                <div class="card-content">
+                    <p>Rodando em Streamlit</p>
+                    <p>SDK: Streamlit</p>
+                </div>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -1372,12 +1535,16 @@ Assistente Administrativa"""
         with col2:
             st.markdown(
                 """
-                    <div class="card">
-            <h4>Modelo</h4>
-            <p style="color: #5A6A7A;">DistilBERT Fine-tuned</p>
-            <p style="color: #5A6A7A;">100% de Acurácia</p>
-            <p style="color: #5A6A7A;">Multilíngue</p>
-        </div>
+            <div class="card">
+                <div class="card-header">
+                    <h4>Modelo</h4>
+                </div>
+                <div class="card-content">
+                    <p>DistilBERT Fine-tuned</p>
+                    <p>100% de Acurácia</p>
+                    <p>Multilíngue</p>
+                </div>
+            </div>
             """,
                 unsafe_allow_html=True,
             )
@@ -1386,9 +1553,13 @@ Assistente Administrativa"""
             st.markdown(
                 """
             <div class="card">
-                <h4>Performance</h4>
-                <p style="color: #5A6A7A;">Cache ativado</p>
-                <p style="color: #5A6A7A;">Cold start: ~3-5s</p>
+                <div class="card-header">
+                    <h4>Performance</h4>
+                </div>
+                <div class="card-content">
+                    <p>Cache ativado</p>
+                    <p>Cold start: ~3-5s</p>
+                </div>
             </div>
             """,
                 unsafe_allow_html=True,
