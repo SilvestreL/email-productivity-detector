@@ -1,639 +1,1234 @@
 import streamlit as st
+import time
+import re
+import io
 import os
-import json
-import pandas as pd
-from datetime import datetime
-from inference import load_model, run_inference
-from utils import parse_file, preprocess_text, suggest_reply
+import nltk
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    TextClassificationPipeline,
+)
+from functools import lru_cache
+from typing import Dict, Literal, Tuple
+import pdfplumber
+import torch
+
+
+# === Sidebar helpers (UI-ONLY) ===
+def _load_svg(path: str) -> str:
+    """UI-ONLY: Carrega SVG local como string; retorna '' se não existir."""
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+    except Exception:
+        pass
+    return ""
+
+
+def _find_icon_svg(name: str) -> str:
+    """
+    UI-ONLY: Tenta resolver o caminho do ícone na pasta icons/.
+    Aceita variações comuns (icons8-<name>.svg, <name>.svg).
+    """
+    candidates = [
+        f"icons/{name}.svg",
+        f"icons/icons8-{name}.svg",
+        f"icons/{name}.SVG",
+        f"icons/icons8-{name}.SVG",
+    ]
+    for c in candidates:
+        svg = _load_svg(c)
+        if svg:
+            return svg
+    return ""
+
 
 # Configuração da página
 st.set_page_config(
-    page_title="Classificador de E-mails",
+    page_title="Email Productivity Classifier",
+    page_icon="📧",  # UI-ONLY: manter ícone para identificação da aba
     layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={"Get Help": None, "Report a bug": None, "About": None},
+    initial_sidebar_state="expanded",  # UI-ONLY: começar com sidebar expandida
 )
 
-# Constantes
-MODEL_DIR = os.getenv("MODEL_DIR", "models/bert_prod_improd")
-METRICS_DIR = "metrics"
-HISTORY_FILE = "data/email_history.csv"
-
-# CSS para ocultar elementos nativos e ajustar paddings
+# CSS customizado para UI profissional
 st.markdown(
     """
 <style>
-/* Mantenha toolbar/header para preservar o botão de abrir a sidebar */
-[data-testid="stToolbar"] { display: flex !important; }
-header[data-testid="stHeader"] { background: transparent !important; }
+/* Reset e configurações base */
+.main .block-container {
+    max-width: 1200px;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
 
-/* Torne o header discreto: esconda botões que não são essenciais */
+/* Ocultar elementos decorativos do Streamlit */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+/* Removido: header {visibility: hidden;} para permitir toggle do sidebar */
 
-/* Continue ocultando decoração e rodapé nativos */
-[data-testid="stDecoration"] { display: none !important; }
-footer, .stApp [data-testid="stStatusWidget"] { display: none !important; }
+/* Tipografia profissional */
+h1 {
+    color: #2E3A46 !important;
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    margin-bottom: 1rem !important;
+}
 
-/* Espaçamento da área principal */
-.block-container { padding-top: 1.25rem; padding-bottom: 1rem; }
+h2 {
+    color: #2E3A46 !important;
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.75rem !important;
+}
 
-/* Estilo leve para métricas e links */
-.metric-container { background-color: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; }
-.sidebar-link { display: block; padding: 0.5rem; margin: 0.25rem 0; text-decoration: none; color: #0066cc; border-radius: 4px; transition: background-color 0.2s; }
-.sidebar-link:hover { background-color: #f0f0f0; }
-/* Debug/garantia de visibilidade da sidebar (remova depois) */
-section[data-testid="stSidebar"] { display: block !important; visibility: visible !important; border-right: 1px solid #eaeaea; }
+h3 {
+    color: #2E3A46 !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Cards e containers */
+.card {
+    background: #F8F9FA;
+    border: 1px solid #EAEAEA;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.metric-card {
+    background: #FFFFFF;
+    border: 1px solid #EAEAEA;
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.metric-value {
+    color: #1A3A6E !important;
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.metric-label {
+    color: #5A6A7A !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+/* Sidebar styling */
+.sidebar .sidebar-content {
+    border-right: 1px solid #EAEAEA;
+}
+
+/* Botões e inputs */
+.stButton > button {
+    background-color: #1A3A6E !important;
+    border-color: #1A3A6E !important;
+    color: white !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    padding: 0.5rem 1rem !important;
+}
+
+.stButton > button:hover {
+    background-color: rgba(26,58,110,0.9) !important;
+    border-color: rgba(26,58,110,0.9) !important;
+}
+
+.stSelectbox > div > div > select {
+    border-color: #EAEAEA !important;
+    border-radius: 6px !important;
+}
+
+.stTextArea > div > div > textarea {
+    border-color: #EAEAEA !important;
+    border-radius: 6px !important;
+}
+
+/* Links e navegação */
+.link {
+    color: #1A3A6E !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
+.link:hover {
+    background-color: rgba(26,58,110,0.08) !important;
+    text-decoration: none !important;
+}
+
+/* Tabelas */
+.dataframe {
+    border: 1px solid #EAEAEA !important;
+    border-radius: 8px !important;
+}
+
+/* Progress bars */
+.stProgress > div > div > div > div {
+    background-color: #1A3A6E !important;
+}
+
+/* Info boxes */
+.stAlert {
+    border: 1px solid #EAEAEA !important;
+    border-radius: 8px !important;
+    background-color: #F8F9FA !important;
+}
+
+/* Expanders */
+.streamlit-expanderHeader {
+    background-color: #F8F9FA !important;
+    border: 1px solid #EAEAEA !important;
+    border-radius: 6px !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .main .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* === Sidebar (UI-ONLY) === */
+section[data-testid="stSidebar"]{
+    background:#FFFFFF;
+    border-right:1px solid #EAEAEA;
+}
+
+/* Garantir que o botão de toggle do sidebar seja visível */
+button[data-testid="baseButton-secondary"] {
+    visibility: visible !important;
+    display: block !important;
+}
+
+
+.sb-wrap{ padding:12px 10px; }
+.sb-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.sb-title{ font-weight:700; color:#2E3A46; font-size:15px; margin:0; }
+.sb-toggle{ border:1px solid #EAEAEA; border-radius:8px; padding:6px 10px; cursor:pointer; background:#FFFFFF; }
+.sb-section{ margin-top:14px; }
+.sb-section h4{ color:#2E3A46; font-size:14px; margin:0 0 8px 0; }
+.sb-text{ color:#5A6A7A; font-size:13px; line-height:1.45; margin:0; }
+.sb-links{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+.sb-link{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; color:#2E3A46; text-decoration:none; }
+.sb-link:hover{ background:rgba(26,58,110,0.08); }
+.sb-icon{ display:inline-flex; width:18px; height:18px; }
+.sb-label{ display:inline-block; }
+.sb-divider{ height:1px; background:#EAEAEA; margin:12px 0; }
+/* collapsed */
+.sb-collapsed .sb-label{ display:none; }
+.sb-collapsed section[data-testid="stSidebar"]{ width:74px !important; }
+/* dark theme */
+.theme-dark section[data-testid="stSidebar"]{ background:#0F1A2B; border-right:1px solid #1E2A3C; }
+.theme-dark .sb-title, .theme-dark .sb-text, .theme-dark .sb-link{ color:#E6EAF0; }
+.theme-dark .sb-link:hover{ background:#142544; }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Inicialização da sessão
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"
+# Constantes
+
+# Constantes
+# Constantes
+MODEL_ID = "models/bert_prod_improd"  # Troque pelo seu modelo no Hub
+ID2LABEL = {0: "Improdutivo", 1: "Produtivo"}
 
 
-def load_metrics():
-    """Carrega métricas do modelo treinado"""
-    metrics = {}
+# === Sidebar renderer (UI-ONLY) ===
+def render_sidebar():
+    """UI-ONLY: Renderiza sidebar com toggle, explicação, modelo e links."""
+    # Estado: tema e colapso
+    if "theme" not in st.session_state:
+        st.session_state["theme"] = "light"
+    if "sb_collapsed" not in st.session_state:
+        st.session_state["sb_collapsed"] = False
 
-    report_path = os.path.join(METRICS_DIR, "classification_report.txt")
-    if os.path.exists(report_path):
-        try:
-            with open(report_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                lines = content.split("\n")
-                for line in lines:
-                    if "accuracy" in line.lower():
-                        try:
-                            accuracy = float(line.split()[-1])
-                            metrics["accuracy"] = accuracy
-                        except:
-                            pass
-                    elif "weighted avg" in line.lower():
-                        parts = line.split()
-                        if len(parts) >= 4:
-                            try:
-                                precision = float(parts[1])
-                                recall = float(parts[2])
-                                f1 = float(parts[3])
-                                metrics["precision"] = precision
-                                metrics["recall"] = recall
-                                metrics["f1"] = f1
-                            except:
-                                pass
-        except Exception as e:
-            st.error(f"Erro ao carregar métricas: {str(e)}")
+    collapsed = st.session_state["sb_collapsed"]
 
-    return metrics
+    # Botão de toggle no topo da sidebar
+    with st.sidebar:
+        # wrapper com classe condicional
+        wrapper_class = "sb-wrap sb-collapsed" if collapsed else "sb-wrap"
+        st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
+        col_a, col_b = st.columns([1, 1])
+        with col_a:
+            st.markdown(
+                '<div class="sb-header"><span class="sb-title">Menu</span></div>',
+                unsafe_allow_html=True,
+            )
+        with col_b:
+            # Espaço para balancear o layout
+            st.markdown("&nbsp;", unsafe_allow_html=True)
 
-def save_to_history(text, prediction, score, confidence):
-    """Salva classificação no histórico"""
-    try:
-        os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
-
-        first_line = (
-            text.split("\n")[0][:100] + "..."
-            if len(text.split("\n")[0]) > 100
-            else text.split("\n")[0]
+        # === Seção: Sobre a Aplicação ===
+        st.markdown('<div class="sb-section">', unsafe_allow_html=True)
+        st.markdown("<h4>Sobre a Aplicação</h4>", unsafe_allow_html=True)
+        st.markdown(
+            '<p class="sb-text sb-label">Classifica e-mails como <strong>Produtivo</strong> ou <strong>Improdutivo</strong> e sugere respostas com base no conteúdo. Interface simples para análise, histórico e métricas.</p>',
+            unsafe_allow_html=True,
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        data = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "text_preview": first_line,
-            "prediction": prediction,
-            "score": score,
-            "confidence": confidence,
+        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+
+        # === Seção: Modelo de ML ===
+        st.markdown('<div class="sb-section">', unsafe_allow_html=True)
+        st.markdown("<h4>Modelo de ML</h4>", unsafe_allow_html=True)
+        st.markdown(
+            '<p class="sb-text sb-label">Arquitetura <strong>Deep Learning (BERT)</strong> para classificação de texto, com fine-tuning em dataset rotulado. Métricas (accuracy, precision, recall, f1) disponíveis na interface.</p>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+
+        # === Seção: Links (SVG inline) ===
+        github_svg = _find_icon_svg("github")
+        linkedin_svg = _find_icon_svg("linkedin")
+        docs_svg = _find_icon_svg("document")
+
+        st.markdown('<div class="sb-section">', unsafe_allow_html=True)
+        st.markdown("<h4>Links</h4>", unsafe_allow_html=True)
+
+        gh_html = f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener" aria-label="GitHub"><span class="sb-icon">{github_svg}</span><span class="sb-label">GitHub</span></a>'
+        li_html = f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener" aria-label="LinkedIn"><span class="sb-icon">{linkedin_svg}</span><span class="sb-label">LinkedIn</span></a>'
+        dc_html = f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener" aria-label="Documentação"><span class="sb-icon">{docs_svg}</span><span class="sb-label">Documentação</span></a>'
+
+        st.markdown('<div class="sb-links">', unsafe_allow_html=True)
+        st.markdown(gh_html, unsafe_allow_html=True)
+        st.markdown(li_html, unsafe_allow_html=True)
+        st.markdown(dc_html, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # fecha wrapper
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# Classificador Inteligente
+class SmartEmailClassifier:
+    """
+    Classificador inteligente que combina modelo BERT com regras baseadas em palavras-chave
+    """
+
+    def __init__(self):
+        # Categorias mais granulares
+        self.categories = {
+            "aniversario_parabens": {
+                "keywords": [
+                    "aniversário",
+                    "parabéns",
+                    "felicidades",
+                    "saúde",
+                    "muitos anos",
+                    "feliz aniversário",
+                ],
+                "priority": 1.0,  # Alta prioridade
+                "response_type": "social_greeting",
+            },
+            "feriado_datas_especiais": {
+                "keywords": [
+                    "feriado",
+                    "feriados",
+                    "natal",
+                    "ano novo",
+                    "páscoa",
+                    "carnaval",
+                    "sexta-feira",
+                    "fim de semana",
+                    "férias",
+                    "descanso",
+                    "aproveitem",
+                    "desejo",
+                    "desejos",
+                    "excelente",
+                    "feliz",
+                    "boa",
+                    "ótimo",
+                    "ótima",
+                ],
+                "priority": 1.0,  # Alta prioridade
+                "response_type": "holiday_greeting",
+            },
+            "saudacoes_sociais": {
+                "keywords": [
+                    "bom dia",
+                    "boa tarde",
+                    "boa noite",
+                    "olá",
+                    "oi",
+                    "olá a todos",
+                    "oi pessoal",
+                    "bom dia a todos",
+                    "bom dia equipe",
+                    "bom dia pessoal",
+                    "apenas para informar",
+                    "apenas informando",
+                    "só para avisar",
+                    "só informando",
+                ],
+                "priority": 0.95,  # Alta prioridade
+                "response_type": "social_greeting",
+            },
+            "agradecimento": {
+                "keywords": [
+                    "obrigado",
+                    "obrigada",
+                    "valeu",
+                    "agradeço",
+                    "agradecemos",
+                    "grato",
+                ],
+                "priority": 0.9,
+                "response_type": "acknowledgment",
+            },
+            "informacao_geral": {
+                "keywords": [
+                    "informar",
+                    "comunicar",
+                    "avisar",
+                    "notificar",
+                    "divulgar",
+                ],
+                "priority": 0.8,
+                "response_type": "information",
+            },
+            "solicitacao_acao": {
+                "keywords": [
+                    "preciso",
+                    "solicito",
+                    "requer",
+                    "necessito",
+                    "urgente",
+                    "reunião",
+                    "projeto",
+                ],
+                "priority": 0.7,
+                "response_type": "action_required",
+            },
+            "problema_urgencia": {
+                "keywords": [
+                    "problema",
+                    "erro",
+                    "falha",
+                    "crítico",
+                    "emergência",
+                    "bug",
+                    "sistema",
+                ],
+                "priority": 0.9,
+                "response_type": "urgent_action",
+            },
+            "lembrete_agendamento": {
+                "keywords": [
+                    "lembrar",
+                    "lembrete",
+                    "agenda",
+                    "horário",
+                    "data",
+                    "deadline",
+                ],
+                "priority": 0.8,
+                "response_type": "reminder",
+            },
         }
 
-        # Definir colunas explicitamente para evitar warnings
-        columns = ["timestamp", "text_preview", "prediction", "score", "confidence"]
+    def classify_with_keywords(self, text: str) -> Tuple[str, float, str]:
+        """
+        Classifica usando palavras-chave com alta confiança
+        """
+        text_lower = text.lower()
 
-        if os.path.exists(HISTORY_FILE):
-            df = pd.read_csv(HISTORY_FILE)
-            # Verificar se o DataFrame não está vazio antes de concatenar
-            if not df.empty:
-                new_df = pd.DataFrame([data], columns=columns)
-                df = pd.concat([df, new_df], ignore_index=True)
-            else:
-                df = pd.DataFrame([data], columns=columns)
-        else:
-            df = pd.DataFrame([data], columns=columns)
+        # Verificar cada categoria
+        for category, config in self.categories.items():
+            for keyword in config["keywords"]:
+                if keyword in text_lower:
+                    confidence = config["priority"]
+                    response_type = config["response_type"]
+                    return category, confidence, response_type
 
-        df.to_csv(HISTORY_FILE, index=False)
+        # Se não encontrar palavras-chave específicas, retornar None
+        return None, 0.0, None
 
-    except Exception as e:
-        st.error(f"Erro ao salvar histórico: {str(e)}")
+    def smart_classify(self, text: str, model_prediction: Dict) -> Dict:
+        """
+        Classificação inteligente combinando palavras-chave e modelo BERT
+        """
+
+        # Primeiro, verificar se há palavras-chave óbvias
+        keyword_category, keyword_confidence, response_type = (
+            self.classify_with_keywords(text)
+        )
+
+        # Se encontrou categoria por palavras-chave com alta confiança
+        if keyword_category and keyword_confidence > 0.8:
+            return {
+                "category": keyword_category,
+                "confidence": keyword_confidence,
+                "response_type": response_type,
+                "method": "keyword_based",
+                "original_model_prediction": model_prediction,
+                "correction_applied": True,
+            }
+
+        # Se não, usar predição do modelo
+        return {
+            "category": model_prediction["category"],
+            "confidence": model_prediction["confidence"],
+            "response_type": "model_based",
+            "method": "bert_model",
+            "correction_applied": False,
+        }
+
+    def get_smart_response(
+        self, classification: Dict, tone: str = "profissional"
+    ) -> str:
+        """
+        Gera resposta inteligente baseada na classificação
+        """
+        category = classification["category"]
+        response_type = classification.get("response_type", "default")
+
+        responses = {
+            "aniversario_parabens": {
+                "profissional": "Obrigado pela mensagem de aniversário! Desejamos muitas felicidades e sucesso.",
+                "amigável": "Que legal! Obrigado por compartilhar essa data especial! 🎉 Muitas felicidades!",
+                "formal": "Agradecemos a mensagem de aniversário. Desejamos muitas felicidades e prosperidade.",
+            },
+            "agradecimento": {
+                "profissional": "De nada! Ficamos felizes em poder ajudar.",
+                "amigável": "Por nada! 😊 Foi um prazer!",
+                "formal": "É um prazer poder auxiliar. Ficamos à disposição para futuras demandas.",
+            },
+            "informacao_geral": {
+                "profissional": "Informação recebida e registrada. Obrigado pela comunicação.",
+                "amigável": "Ok, anotado! 👍 Obrigado por informar!",
+                "formal": "Informação recebida e devidamente registrada. Agradecemos a comunicação.",
+            },
+            "solicitacao_acao": {
+                "profissional": "Solicitação recebida. Vamos analisar e retornar em breve com as informações solicitadas.",
+                "amigável": "Beleza! Vou dar uma olhada nisso e te retorno! 😊",
+                "formal": "Solicitação recebida e está sendo processada. Retornaremos em breve com as informações solicitadas.",
+            },
+            "problema_urgencia": {
+                "profissional": "Problema identificado. Nossa equipe técnica foi notificada e está trabalhando na solução.",
+                "amigável": "Ops! Vou resolver isso rapidinho! 🚀",
+                "formal": "Problema identificado e nossa equipe técnica foi imediatamente notificada. Estamos trabalhando na solução.",
+            },
+            "lembrete_agendamento": {
+                "profissional": "Lembrete registrado. Confirmaremos o agendamento em breve.",
+                "amigável": "Perfeito! Vou anotar na agenda! 📅",
+                "formal": "Lembrete registrado e será confirmado em breve. Agradecemos a comunicação.",
+            },
+            "feriado_datas_especiais": {
+                "profissional": "Obrigado pela mensagem de feriado! Desejamos a todos um excelente descanso e aproveitem bastante!",
+                "amigável": "Que ótimo! 🎉 Obrigado por compartilhar essa energia positiva! Aproveitem muito o feriado!",
+                "formal": "Agradecemos os votos de feriado. Desejamos a todos um excelente período de descanso e renovação.",
+            },
+            "saudacoes_sociais": {
+                "profissional": "Bom dia! Obrigado pela mensagem. Ficamos à disposição para futuras demandas.",
+                "amigável": "Oi! 😊 Obrigado pela mensagem! Tudo bem por aí?",
+                "formal": "Bom dia! Agradecemos a comunicação. Ficamos à disposição para futuras demandas.",
+            },
+        }
+
+        # Retornar resposta baseada na categoria e tom
+        if category in responses:
+            return responses[category].get(tone, responses[category]["profissional"])
+
+        # Resposta padrão se não encontrar categoria específica
+        return "Mensagem recebida. Obrigado pelo contato."
 
 
-@st.cache_resource
-def load_cached_model():
-    """Carrega o modelo com cache para evitar recarregamento"""
+# Instanciar classificador inteligente
+smart_classifier = SmartEmailClassifier()
+
+
+# Cache do modelo para evitar recarga
+@st.cache_resource(show_spinner=True)
+def get_classifier():
+    """Carrega o modelo fine-tuned para classificação de emails"""
     try:
-        return load_model(MODEL_DIR)
+        # Carregar tokenizer e modelo local
+        model_path = os.path.join(os.path.dirname(__file__), MODEL_ID)
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModelForSequenceClassification.from_pretrained(model_path)
+
+        # Configurar dispositivo
+        device = 0 if torch.cuda.is_available() else -1
+
+        # Criar pipeline
+        return TextClassificationPipeline(
+            model=model, tokenizer=tokenizer, return_all_scores=True, device=device
+        )
     except Exception as e:
-        st.error(f"Erro ao carregar modelo: {str(e)}")
-        return None, None
+        st.error(f"Erro ao carregar modelo: {e}")
+        st.info(
+            "💡 Certifique-se de que o modelo está disponível em models/bert_prod_improd"
+        )
+        return None
 
 
-def render_sidebar(project, repo_url, model_info, metrics):
-    """Sidebar minimalista e profissional para entrega"""
-    s = st.sidebar
+# Cache das stopwords em português
+@st.cache_resource(show_spinner=False)
+def load_stopwords_pt():
+    """Carrega stopwords em português"""
+    nltk.download("stopwords", quiet=True)
+    return set(stopwords.words("portuguese"))
 
-    # Cabeçalho
-    s.markdown("### Email Productivity Classifier")
-    s.caption("Classificação de e-mails e sugestão de resposta automática.")
-    s.divider()
 
-    # Links
-    s.markdown("**Links**")
-    col_l1, col_l2 = s.columns(2)
-    col_l1.link_button("GitHub", repo_url, use_container_width=True)
-    col_l2.link_button(
-        "Documentação", project.get("docs_url", "#"), use_container_width=True
-    )
-    if project.get("contacts_url"):
-        s.link_button("Contato", project["contacts_url"], use_container_width=True)
-    s.divider()
+# Carregar stopwords
+try:
+    from nltk.corpus import stopwords
 
-    # Modelo
-    s.markdown("**Modelo**")
-    s.write(f"Nome: {model_info.get('name', '—')}")
-    s.write(f"Origem: {model_info.get('source', '—')}")
-    s.write(f"Versão: {model_info.get('revision', '—')}")
-    if model_info.get("notes"):
-        s.caption(model_info["notes"])
-    s.divider()
+    STOP_PT = load_stopwords_pt()
+except Exception as e:
+    st.warning(f"Erro ao carregar stopwords: {e}")
+    STOP_PT = set()
 
-    # Métricas (resumo)
-    s.markdown("**Métricas (resumo)**")
 
-    def fmt(x):
-        if x is None:
-            return "—"
+def preprocess(text: str) -> str:
+    """
+    Pré-processamento NLP para português brasileiro
+
+    Args:
+        text: Texto a ser processado
+
+    Returns:
+        Texto processado
+    """
+    if not text:
+        return ""
+
+    # Normalizar espaços
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Tokenização simples por palavras
+    tokens = re.findall(r"\w+|\S", text, flags=re.UNICODE)
+
+    # Remover stopwords (case-insensitive)
+    tokens = [t for t in tokens if t.lower() not in STOP_PT]
+
+    # Opcional: stemming leve com RSLP
+    # from nltk.stem import RSLPStemmer
+    # stemmer = RSLPStemmer()
+    # tokens = [stemmer.stem(t) if t.isalpha() else t for t in tokens]
+
+    return " ".join(tokens)
+
+
+def read_uploaded_file(uploaded) -> str:
+    """
+    Lê arquivo enviado (.txt ou .pdf)
+
+    Args:
+        uploaded: Arquivo enviado via st.file_uploader
+
+    Returns:
+        Conteúdo do arquivo como string
+    """
+    if uploaded is None:
+        return ""
+
+    try:
+        if uploaded.type == "text/plain":
+            # Arquivo .txt
+            content = uploaded.read()
+            return content.decode("utf-8")
+
+        elif uploaded.type == "application/pdf":
+            # Arquivo .pdf
+            content = uploaded.read()
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                return text
+
+        else:
+            st.error(f"Tipo de arquivo não suportado: {uploaded.type}")
+            return ""
+
+    except Exception as e:
+        st.error(f"Erro ao ler arquivo: {e}")
+        return ""
+
+
+def classify_email(content: str) -> Dict:
+    """
+    Classifica email usando classificador inteligente (BERT + palavras-chave)
+
+    Args:
+        content: Conteúdo do email
+
+    Returns:
+        Dict com category, confidence, scores e explanation
+    """
+    # Usar apenas o conteúdo
+    text = content.strip()
+
+    # Se vazio, retornar categoria Improdutivo com confiança 0.0
+    if not text:
+        return {
+            "category": "Improdutivo",
+            "confidence": 0.0,
+            "scores": {"Produtivo": 0.0, "Improdutivo": 1.0},
+            "explanation": "Nenhum conteúdo recebido.",
+        }
+
+    # Pré-processar texto
+    processed_text = preprocess(text)
+
+    # Carregar classificador BERT
+    classifier = get_classifier()
+
+    if classifier is None:
+        return {
+            "category": "Erro",
+            "confidence": 0.0,
+            "scores": {"Produtivo": 0.0, "Improdutivo": 0.0},
+            "explanation": "Erro ao carregar modelo.",
+            "processed_text": processed_text,
+            "original_text": text,
+        }
+
+    # Classificar com BERT (limitar tamanho do texto)
+    result = classifier(processed_text[:4000])  # Evita textos muito longos
+
+    # Mapear resultados do BERT
+    scores = {}
+    for pred in result[0]:
+        # O modelo retorna labels como strings ("Improdutivo", "Produtivo")
+        label_name = pred["label"]
+        scores[label_name] = float(pred["score"])
+
+    # Encontrar categoria com maior score do BERT
+    bert_category = max(scores, key=scores.get)
+    bert_confidence = scores[bert_category]
+
+    # Predição do modelo BERT
+    model_prediction = {"category": bert_category, "confidence": bert_confidence}
+
+    # Usar classificador inteligente para correção
+    smart_result = smart_classifier.smart_classify(text, model_prediction)
+
+    # Determinar categoria final
+    final_category = smart_result["category"]
+    final_confidence = smart_result["confidence"]
+    method_used = smart_result["method"]
+    correction_applied = smart_result["correction_applied"]
+
+    # Gerar explicação inteligente
+    if correction_applied:
+        explanation = f"Classificação inteligente: {final_category} (corrigido de {bert_category}) com {final_confidence:.2%}."
+    else:
+        explanation = (
+            f"Modelo BERT classificou como {final_category} com {final_confidence:.2%}."
+        )
+
+    return {
+        "category": final_category,
+        "confidence": final_confidence,
+        "scores": scores,
+        "explanation": explanation,
+        "processed_text": processed_text,
+        "original_text": text,
+        "method": method_used,
+        "correction_applied": correction_applied,
+        "bert_prediction": bert_category,
+        "smart_category": final_category,
+    }
+
+
+def suggest_reply(
+    category: str, tone: str, content: str, classification_info: Dict = None
+) -> Tuple[str, float, str]:
+    """
+    Sugere resposta inteligente baseada na categoria e contexto
+
+    Args:
+        category: Categoria do email (pode ser específica como "aniversario_parabens")
+        tone: Tom da resposta (profissional/amigável/formal)
+        content: Conteúdo original
+        classification_info: Informações adicionais da classificação
+
+    Returns:
+        Tuple com (reply, confidence, reasoning)
+    """
+
+    # Se temos informações de classificação inteligente, usar o classificador
+    if classification_info and hasattr(smart_classifier, "get_smart_response"):
         try:
-            v = float(x)
-            v = v if v <= 1.0 else v / 100.0  # aceita 0–1 ou %
-            return f"{v:.2%}"
-        except Exception:
-            return str(x)
+            reply = smart_classifier.get_smart_response(classification_info, tone)
+            confidence = 0.95
+            reasoning = f"Resposta inteligente para categoria '{category}' com tom {tone} - gerada automaticamente."
+            return reply, confidence, reasoning
+        except Exception as e:
+            st.warning(f"Erro ao gerar resposta inteligente: {e}")
+            # Continuar com templates tradicionais
 
-    m = metrics or {}
-    c1, c2 = s.columns(2)
-    c1.metric("Accuracy", fmt(m.get("accuracy")))
-    c2.metric("F1", fmt(m.get("f1")))
-    c3, c4 = s.columns(2)
-    c3.metric("Precision", fmt(m.get("precision")))
-    c4.metric("Recall", fmt(m.get("recall")))
+    # Templates tradicionais para compatibilidade
+    produtivo_templates = {
+        "profissional": """Prezado(a),
 
-    with s.expander("Como interpretar"):
-        s.write(
-            "- **Accuracy**: acerto global.\n"
-            "- **Precision**: acertos entre os previstos como positivos.\n"
-            "- **Recall**: positivos reais identificados.\n"
-            "- **F1**: equilíbrio entre precision e recall."
-        )
-    s.divider()
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e confirmamos que requer nossa atenção.
 
-    # Sobre
-    s.markdown("**Sobre o projeto**")
-    s.write(
-        project.get(
-            "about",
-            "Interface para classificação de e-mails (produtivo/improdutivo) e geração de resposta.",
-        )
+Para dar continuidade, precisamos de algumas informações:
+- Qual o prazo esperado para esta demanda?
+- Há algum anexo que deveria acompanhar esta mensagem?
+- Existe alguma prioridade específica?
+
+Atenciosamente,
+Equipe de Atendimento""",
+        "amigável": """Oi!
+
+Obrigado pelo contato! 😊 
+
+Recebemos sua mensagem e vamos dar a atenção necessária.
+
+Para organizarmos melhor, você poderia me informar:
+- Qual o prazo que você tem em mente?
+- Tem algum arquivo para anexar?
+- É algo urgente?
+
+Qualquer dúvida, é só falar!
+
+Abraços!""",
+        "formal": """Exmo(a). Sr(a).,
+
+Agradecemos o contato e informamos que sua comunicação foi recebida e está sendo processada.
+
+Para prosseguirmos adequadamente, solicitamos as seguintes informações:
+- Prazo estimado para conclusão
+- Documentos complementares, se houver
+- Nível de prioridade atribuído
+
+Em breve retornaremos com as informações solicitadas.
+
+Respeitosamente,
+Departamento de Atendimento""",
+    }
+
+    improdutivo_templates = {
+        "profissional": """Prezado(a),
+
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e informamos que não requer ação específica de nossa parte.
+
+Agradecemos a comunicação e ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
+
+Atenciosamente,
+Equipe de Comunicação""",
+        "amigável": """Oi!
+
+Obrigado pelo contato! 😊 
+
+Recebemos sua mensagem e entendemos que não precisa de nenhuma ação nossa no momento.
+
+Se precisar de algo específico no futuro, é só falar!
+
+Abraços!""",
+        "formal": """Exmo(a). Sr(a).,
+
+Agradecemos o contato e informamos que sua comunicação foi recebida.
+
+Conforme análise, esta mensagem não requer ação específica de nosso departamento no momento.
+
+Ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
+
+Respeitosamente,
+Departamento de Comunicação""",
+    }
+
+    # Selecionar template baseado na categoria
+    if category in ["Produtivo", "solicitacao_acao", "problema_urgencia"]:
+        reply = produtivo_templates.get(tone, produtivo_templates["profissional"])
+        confidence = 0.90
+        reasoning = f"Resposta automática para email {category} com tom {tone} - solicita confirmação de objetivo/prazo/anexos."
+    else:
+        reply = improdutivo_templates.get(tone, improdutivo_templates["profissional"])
+        confidence = 0.95
+        reasoning = f"Resposta automática para email {category} com tom {tone} - agradece e indica que não requer ação."
+
+    return reply, confidence, reasoning
+
+
+# Interface principal
+def main():
+    # UI-ONLY: Sidebar local com toggle e links
+    render_sidebar()
+
+    st.title("Email Intelligence Classifier")
+    st.subheader(
+        "Classificação Inteligente de Emails + Respostas Automáticas Contextuais"
     )
 
-    # Rodapé discreto
-    footer_left, footer_right = s.columns([1, 1])
-    footer_left.caption(project.get("owner", ""))
-    footer_right.caption(project.get("version", "v1.0"))
-
-
-def render_main_content():
-    """Renderiza o conteúdo principal em grid baseado no design do usuário"""
-    col1, col2 = st.columns([1, 1])
+    # Instruções de uso
+    st.markdown("### Como usar (3 passos)")
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("### Analisar E-mail")
         st.markdown(
-            "*Cole o texto do e-mail ou faça upload de um arquivo para análise*"
-        )
-
-        # Inicializar variável email_text
-        email_text = ""
-
-        # Tabs para entrada
-        tab1, tab2 = st.tabs(["Colar Texto", "Upload Arquivo"])
-
-        with tab1:
-            email_text = st.text_area(
-                "Cole aqui o assunto e corpo do e-mail que deseja analisar...",
-                height=200,
-                placeholder="Cole aqui o assunto e corpo do e-mail que deseja analisar...",
-                key="email_text_input",
-            )
-
-        with tab2:
-            uploaded_file = st.file_uploader(
-                "Selecione um arquivo:",
-                type=["txt", "pdf"],
-                help="Apenas arquivos .txt ou .pdf são aceitos",
-                key="file_uploader",
-            )
-
-            if uploaded_file is not None:
-                try:
-                    email_text = parse_file(uploaded_file)
-                    st.success(f"Arquivo processado: {uploaded_file.name}")
-                except Exception as e:
-                    st.error(f"Erro ao processar arquivo: {str(e)}")
-                    email_text = ""
-
-        # Opções avançadas colapsáveis
-        with st.expander("Opções Avançadas"):
-            col_a1, col_a2 = st.columns(2)
-
-            with col_a1:
-                model_option = st.selectbox(
-                    "Modelo:",
-                    ["Local BERT", "OpenAI", "Hugging Face"],
-                    key="model_select",
-                )
-
-                max_tokens = st.number_input(
-                    "Máximo de Tokens:",
-                    min_value=100,
-                    max_value=2000,
-                    value=500,
-                    step=100,
-                    key="max_tokens",
-                )
-
-            with col_a2:
-                timeout = st.number_input(
-                    "Timeout (segundos):",
-                    min_value=10,
-                    max_value=300,
-                    value=60,
-                    step=10,
-                    key="timeout",
-                )
-
-                language = st.selectbox(
-                    "Idioma:",
-                    ["Português", "Inglês", "Espanhol"],
-                    key="language_select",
-                )
-
-        # Botão principal de ação
-        if st.button(
-            "Classificar e Sugerir Resposta",
-            type="primary",
-            key="classify_btn",
-            use_container_width=True,
-        ):
-            if email_text and email_text.strip():
-                classify_email(email_text)
-            else:
-                st.warning("Por favor, insira algum texto para classificar.")
-
-        # Status do processamento
-        st.caption("🔄 Processamos seu texto apenas para esta análise")
-
-    with col2:
-        # Resultado da Classificação
-        with st.container():
-            st.markdown("#### Resultado da Classificação")
-            if "classification_result" in st.session_state:
-                display_classification_result()
-            else:
-                st.info("Nenhuma análise ainda")
-
-        st.divider()
-
-        # Resposta Sugerida
-        with st.container():
-            st.markdown("#### Resposta Sugerida")
-            if "classification_result" in st.session_state:
-                display_suggested_reply()
-            else:
-                st.info("Nenhuma resposta gerada ainda")
-
-        st.divider()
-
-        # Histórico (local)
-        with st.container():
-            col_header, col_clear = st.columns([3, 1])
-            with col_header:
-                st.markdown("#### Histórico (local)")
-            with col_clear:
-                if st.button(
-                    "Limpar histórico", help="Limpar histórico", key="clear_history_btn"
-                ):
-                    clear_history()
-
-            display_history()
-
-
-def classify_email(text):
-    """Executa a classificação do e-mail"""
-    try:
-        tokenizer, model = load_cached_model()
-        if tokenizer is None or model is None:
-            st.error("Não foi possível carregar o modelo.")
-            return
-
-        processed_text = preprocess_text(text)
-        prediction, confidence, scores = run_inference(tokenizer, model, processed_text)
-
-        # robusto para chaves 0/1 como int ou string
-        def get_score_for_label(scores_dict, label_int):
-            return scores_dict.get(label_int, scores_dict.get(str(label_int), 0.0))
-
-        score = (
-            get_score_for_label(scores, 1)
-            if prediction == "Produtivo"
-            else get_score_for_label(scores, 0)
-        )
-        save_to_history(text, prediction, score, confidence)
-
-        st.session_state.classification_result = {
-            "prediction": prediction,
-            "confidence": confidence,
-            "scores": scores,
-            "text": text,
-        }
-
-        st.rerun()
-
-    except Exception as e:
-        st.error(f"Erro durante a classificação: {str(e)}")
-
-
-def display_classification_result():
-    """Exibe o resultado da classificação"""
-    if "classification_result" not in st.session_state:
-        return
-
-    result = st.session_state.classification_result
-
-    # Classe prevista
-    prediction_color = "#28a745" if result["prediction"] == "Produtivo" else "#dc3545"
-    st.markdown(
-        f"""
-        <div class="metric-container">
-            <h4>Classe Prevista: <span style="color: {prediction_color}">{result['prediction']}</span></h4>
-            <p>Confiança: {result['confidence']:.2%}</p>
+            """
+        <div class="card">
+            <h4>1. Envie arquivo ou cole texto</h4>
+            <p style="color: #5A6A7A;">Upload .txt/.pdf ou cole o conteúdo do email</p>
         </div>
         """,
-        unsafe_allow_html=True,
-    )
-
-    # Tabela de scores
-    st.markdown("#### Scores por Classe")
-    s = result["scores"]
-    getv = lambda k: s.get(k, s.get(str(k), 0.0))
-
-    scores_df = pd.DataFrame(
-        [
-            {"Classe": "Produtivo", "Score": getv(1)},
-            {"Classe": "Improdutivo", "Score": getv(0)},
-        ]
-    )
-    st.dataframe(scores_df, use_container_width=True)
-
-
-def display_suggested_reply():
-    """Exibe a resposta sugerida de forma organizada"""
-    if "classification_result" not in st.session_state:
-        return
-
-    result = st.session_state.classification_result
-    suggested_reply = suggest_reply(result["prediction"], result["text"])
-
-    # Botões de ação para a resposta
-    col_r1, col_r2, col_r3 = st.columns([1, 1, 1])
-    with col_r1:
-        if st.button("Editar", key="edit_reply"):
-            st.session_state.editing_reply = True
-    with col_r2:
-        if st.button("Salvar", key="save_reply"):
-            st.success("Resposta salva!")
-    with col_r3:
-        if st.button("Copiar", key="copy_reply"):
-            st.success("Copiado para área de transferência!")
-
-    # Área de edição ou exibição
-    if st.session_state.get("editing_reply", False):
-        edited_reply = st.text_area(
-            "Editar resposta:", value=suggested_reply, height=100, key="edit_reply_area"
-        )
-        if st.button("Confirmar edição"):
-            st.session_state.editing_reply = False
-            st.rerun()
-    else:
-        st.markdown(
-            f"""
-            <div class="metric-container">
-                {suggested_reply}
-            </div>
-            """,
             unsafe_allow_html=True,
         )
 
-
-def display_history():
-    """Exibe o histórico de classificações em formato de tabela"""
-    if os.path.exists(HISTORY_FILE):
-        try:
-            df = pd.read_csv(HISTORY_FILE)
-            if not df.empty:
-                # Formatar dados para exibição
-                display_df = df.copy()
-                display_df["timestamp"] = pd.to_datetime(
-                    display_df["timestamp"]
-                ).dt.strftime("%Y-%m-%d %H:%M")
-                display_df["text_preview"] = display_df["text_preview"].str[:50] + "..."
-                display_df["confidence"] = display_df["confidence"].apply(
-                    lambda x: f"{x:.0%}"
-                )
-
-                # Renomear colunas
-                display_df.columns = [
-                    "Data/Hora",
-                    "Título",
-                    "Categoria",
-                    "Score",
-                    "Confiança",
-                ]
-
-                # Adicionar coluna de origem (simulada)
-                display_df["Origem"] = [
-                    "Texto" if i % 2 == 0 else "Upload" for i in range(len(display_df))
-                ]
-
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
-            else:
-                st.info("Nenhuma classificação encontrada no histórico.")
-        except Exception as e:
-            st.error(f"Erro ao carregar histórico: {str(e)}")
-    else:
-        st.info("Nenhum histórico encontrado.")
-
-
-def clear_history():
-    """Limpa o histórico de classificações"""
-    try:
-        if os.path.exists(HISTORY_FILE):
-            os.remove(HISTORY_FILE)
-            st.success("Histórico limpo com sucesso!")
-            st.rerun()
-    except Exception as e:
-        st.error(f"Erro ao limpar histórico: {str(e)}")
-
-
-def render_metrics_page():
-    """Renderiza a página de métricas"""
-    st.markdown("## Métricas do Modelo")
-
-    metrics = load_metrics()
-
-    # KPIs principais
-    st.markdown("### Indicadores de Performance")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        accuracy = metrics.get("accuracy", 0.0)
-        st.metric("Accuracy", f"{accuracy:.2%}" if accuracy > 0 else "N/A")
-
     with col2:
-        precision = metrics.get("precision", 0.0)
-        st.metric("Precision", f"{precision:.2%}" if precision > 0 else "N/A")
+        st.markdown(
+            """
+        <div class="card">
+            <h4>2. Escolha o tom da resposta</h4>
+            <p style="color: #5A6A7A;">Profissional, Amigável ou Formal</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
     with col3:
-        recall = metrics.get("recall", 0.0)
-        st.metric("Recall", f"{recall:.2%}" if recall > 0 else "N/A")
+        st.markdown(
+            """
+        <div class="card">
+            <h4>3. Clique em Analisar</h4>
+            <p style="color: #5A6A7A;">Veja classificação inteligente e receba resposta contextual</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
-    with col4:
-        f1 = metrics.get("f1", 0.0)
-        st.metric("F1-Score", f"{f1:.2%}" if f1 > 0 else "N/A")
+    st.markdown("---")
 
-    # Matriz de confusão
-    st.markdown("### Matriz de Confusão")
-    confusion_matrix_path = os.path.join(METRICS_DIR, "confusion_matrix.png")
-    if os.path.exists(confusion_matrix_path):
-        st.image(confusion_matrix_path, use_column_width=True)
-    else:
-        st.info("Matriz de confusão não encontrada.")
+    # Inputs
+    col1, col2 = st.columns([2, 1])
 
-    # Classification report
-    st.markdown("### Relatório de Classificação")
-    report_path = os.path.join(METRICS_DIR, "classification_report.txt")
-    if os.path.exists(report_path):
-        with open(report_path, "r", encoding="utf-8") as f:
-            st.code(f.read(), language="text")
-    else:
-        st.info("Relatório de classificação não encontrado.")
+    with col1:
+        content = st.text_area(
+            "Conteúdo do Email",
+            height=250,
+            placeholder="Digite o conteúdo do email aqui...",
+            help="Conteúdo completo do email",
+        )
 
+        # Upload de arquivo
+        uploaded = st.file_uploader(
+            "Ou envie um arquivo (.txt ou .pdf)",
+            type=["txt", "pdf"],
+            help="Envie um arquivo .txt ou .pdf para análise",
+        )
 
-def render_history_page():
-    """Renderiza a página de histórico"""
-    st.markdown("## Histórico de Classificações")
+    with col2:
+        tone = st.selectbox(
+            "Tom da Resposta",
+            ["profissional", "amigável", "formal"],
+            index=0,
+            help="Tom da resposta sugerida",
+        )
 
-    if os.path.exists(HISTORY_FILE):
-        try:
-            df = pd.read_csv(HISTORY_FILE)
-            if not df.empty:
-                st.dataframe(df, use_container_width=True)
+        st.markdown("### Sobre")
+        st.markdown(
+            """
+        <div class="card">
+            <p><strong>Modelo:</strong> BERT PT-BR Fine-tuned + Classificador Inteligente</p>
+            <p><strong>Método:</strong> Text Classification + Palavras-chave</p>
+            <p><strong>Categorias:</strong> Produtivo/Improdutivo + Específicas</p>
+            <p><strong>Cache:</strong> Ativado</p>
+            <p><strong>NLP:</strong> Stopwords PT-BR + Regras Inteligentes</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
-                # Estatísticas básicas
-                st.markdown("### Estatísticas")
-                col1, col2, col3 = st.columns(3)
+    st.markdown("---")
 
-                with col1:
-                    st.metric("Total de Classificações", len(df))
+    # Botão de análise
+    if st.button(
+        "Analisar Email", type="primary", width="stretch"
+    ):  # UI-ONLY: troca use_container_width por width='stretch'
+        # Determinar texto final
+        final_content = ""
 
-                with col2:
-                    prod_count = len(df[df["prediction"] == "Produtivo"])
-                    st.metric("E-mails Produtivos", prod_count)
+        if uploaded is not None:
+            # Priorizar arquivo se enviado
+            file_content = read_uploaded_file(uploaded)
+            if file_content:
+                final_content = file_content
+                st.success(f"Arquivo processado: {uploaded.name}")
+        else:
+            # Usar texto colado
+            final_content = content
 
-                with col3:
-                    impr_count = len(df[df["prediction"] == "Improdutivo"])
-                    st.metric("E-mails Improdutivos", impr_count)
+        if not final_content:
+            st.warning("Por favor, digite o conteúdo do email ou envie um arquivo.")
+            return
 
-                # Botão para limpar histórico
-                if st.button("Limpar Histórico"):
-                    os.remove(HISTORY_FILE)
-                    st.success("Histórico limpo com sucesso!")
-                    st.rerun()
+        # Medir tempo de inferência
+        start_time = time.perf_counter()
+
+        # Classificar email
+        with st.spinner("Classificando email..."):
+            classification = classify_email(final_content)
+
+        # Medir tempo
+        inference_time = (time.perf_counter() - start_time) * 1000  # ms
+
+        # Gerar resposta sugerida
+        with st.spinner("Gerando resposta..."):
+            reply, reply_confidence, reasoning = suggest_reply(
+                classification["category"], tone, final_content, classification
+            )
+
+        st.markdown("---")
+
+        # Resultados em duas colunas
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.markdown("### Resumo")
+
+            # Badge da categoria
+            category = classification["category"]
+            confidence = classification["confidence"]
+
+            # Determinar cor e estilo baseado na categoria
+            if category in [
+                "aniversario_parabens",
+                "agradecimento",
+                "informacao_geral",
+                "feriado_datas_especiais",
+                "saudacoes_sociais",
+            ]:
+                st.markdown(
+                    f"""
+                <div class="card" style="border-left: 4px solid #1A3A6E;">
+                    <h4 style="color: #1A3A6E; margin: 0;">{category.upper().replace('_', ' ')}</h4>
+                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+            elif category in [
+                "solicitacao_acao",
+                "problema_urgencia",
+                "lembrete_agendamento",
+            ]:
+                st.markdown(
+                    f"""
+                <div class="card" style="border-left: 4px solid #2E7D32;">
+                    <h4 style="color: #2E7D32; margin: 0;">{category.upper().replace('_', ' ')}</h4>
+                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+            elif category == "Produtivo":
+                st.markdown(
+                    f"""
+                <div class="card" style="border-left: 4px solid #2E7D32;">
+                    <h4 style="color: #2E7D32; margin: 0;">PRODUTIVO</h4>
+                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+            elif category == "Improdutivo":
+                st.markdown(
+                    f"""
+                <div class="card" style="border-left: 4px solid #D32F2F;">
+                    <h4 style="color: #D32F2F; margin: 0;">IMPRODUTIVO</h4>
+                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
             else:
-                st.info("Nenhuma classificação encontrada no histórico.")
-        except Exception as e:
-            st.error(f"Erro ao carregar histórico: {str(e)}")
-    else:
-        st.info("Nenhum histórico encontrado.")
+                st.markdown(
+                    f"""
+                <div class="card" style="border-left: 4px solid #FF9800;">
+                    <h4 style="color: #FF9800; margin: 0;">{category.upper()}</h4>
+                    <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
+            # Mostrar se foi corrigido
+            if classification.get("correction_applied"):
+                st.markdown(
+                    f"""
+                <div class="card" style="background-color: rgba(26,58,110,0.05);">
+                    <p style="color: #1A3A6E; margin: 0;"><strong>Correção Aplicada:</strong> {classification['bert_prediction']} → {classification['smart_category']}</p>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
-def render_help_page():
-    """Renderiza a página de ajuda"""
-    st.markdown("## Ajuda")
+            # Métricas
+            col_metric1, col_metric2 = st.columns(2)
+            with col_metric1:
+                st.markdown(
+                    f"""
+                <div class="metric-card">
+                    <div class="metric-value">{classification['confidence']:.1%}</div>
+                    <div class="metric-label">Confiança</div>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
-    st.markdown("### Como usar a aplicação")
+            with col_metric2:
+                st.markdown(
+                    f"""
+                <div class="metric-card">
+                    <div class="metric-value">{inference_time:.0f}ms</div>
+                    <div class="metric-label">Tempo de Inferência</div>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
 
-    st.markdown(
-        """
-        **1. Faça upload ou cole o texto**
-        - Use o campo de texto para colar o conteúdo do e-mail
-        - Ou faça upload de um arquivo .txt ou .pdf
-        
-        **2. Clique em Classificar**
-        - A aplicação processará o texto e retornará a classificação
-        
-        **3. Veja o resultado e resposta sugerida**
-        - A classe prevista (Produtivo/Improdutivo)
-        - Os scores de confiança para cada classe
-        - Uma resposta automática sugerida baseada na classificação
-        """
+            # Explicação
+            st.markdown(
+                f"""
+            <div class="card">
+                <p style="color: #5A6A7A; margin: 0;">{classification['explanation']}</p>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col2:
+            st.markdown("### Detalhes")
+
+            # Scores brutos
+            st.markdown("**Scores Detalhados:**")
+            for label, score in classification["scores"].items():
+                if label == "Produtivo":
+                    st.progress(score, text=f"Produtivo: {score:.1%}")
+                else:
+                    st.progress(score, text=f"Improdutivo: {score:.1%}")
+
+            # Informações técnicas
+            with st.expander("Informações Técnicas"):
+                tech_info = {
+                    "modelo": "BERT Local (Fine-tuned) + Classificador Inteligente",
+                    "método": classification.get("method", "text-classification"),
+                    "tempo_inferencia_ms": round(inference_time, 2),
+                    "scores_completos": classification["scores"],
+                    "tamanho_texto_original": len(classification["original_text"]),
+                    "tamanho_texto_processado": len(classification["processed_text"]),
+                    "modelo_local": MODEL_ID,
+                }
+
+                # Adicionar informações de correção se aplicável
+                if classification.get("correction_applied"):
+                    tech_info.update(
+                        {
+                            "correcao_aplicada": True,
+                            "predicao_bert": classification["bert_prediction"],
+                            "categoria_final": classification["smart_category"],
+                            "metodo_final": classification["method"],
+                        }
+                    )
+
+                st.json(tech_info)
+
+        st.markdown("---")
+
+        # Resposta sugerida
+        st.markdown("### Resposta Sugerida")
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.text_area(
+                "Resposta Gerada",
+                value=reply,
+                height=200,
+                disabled=True,
+                help="Resposta sugerida baseada na classificação e tom selecionado",
+            )
+
+        with col2:
+            st.markdown(
+                f"""
+            <div class="metric-card">
+                <div class="metric-value">{reply_confidence:.1%}</div>
+                <div class="metric-label">Confiança da Resposta</div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            st.caption(f"{reasoning}")
+
+            # Botão para copiar
+            if st.button(
+                "Copiar Resposta", width="content"
+            ):  # UI-ONLY: width fixo para botão
+                st.code(reply, language=None)
+                st.success("Resposta copiada! (Use Ctrl+C)")
+
+    st.markdown("---")
+
+    # Rodapé
+    st.markdown("### Informações")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(
+            """
+        <div class="card">
+            <h4>Plataforma</h4>
+            <p style="color: #5A6A7A;">Rodando em Hugging Face Spaces</p>
+            <p style="color: #5A6A7A;">SDK: Streamlit</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown(
+            """
+        <div class="card">
+            <h4>Modelo</h4>
+            <p style="color: #5A6A7A;">BERT PT-BR Fine-tuned + IA</p>
+            <p style="color: #5A6A7A;">Classificação Inteligente</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            """
+        <div class="card">
+            <h4>Performance</h4>
+            <p style="color: #5A6A7A;">Cache ativado</p>
+            <p style="color: #5A6A7A;">Cold start: ~3-5s</p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    st.caption(
+        "**Dica**: A primeira execução pode levar alguns segundos (cold start). Modelo local + classificador inteligente ativado!"
     )
-
-    st.markdown("### Sobre o modelo")
-    st.markdown(
-        """
-        Este classificador utiliza um modelo BERT fine-tuned para determinar se um e-mail é produtivo ou improdutivo.
-        
-        - **E-mails Produtivos**: Requerem ação ou resposta específica
-        - **E-mails Improdutivos**: Não requerem ação imediata
-        """
-    )
-
-
-def main():
-    """Função principal da aplicação"""
-
-    """Função principal da aplicação"""
-    project = {
-        "docs_url": "https://seu-docs",
-        "contacts_url": None,
-        "about": "App para o case AutoU. Upload de texto/PDF, classificação e resposta sugerida.",
-        "owner": "Equipe de Dados",
-        "version": "v1.0",
-    }
-    repo_url = "https://github.com/lucassilvestre/email-productivity-detector"
-    model_info = {
-        "name": "distilbert-base-cased (fine-tuned)",
-        "source": "Hugging Face",
-        "revision": "v1.0",
-        "notes": "Carregado no início da sessão.",
-    }
-    metrics = load_metrics()
-    render_sidebar(project, repo_url, model_info, metrics)
-
-    st.markdown("## Email Productivity Classifier")
-    st.divider()
-
-    render_main_content()
 
 
 if __name__ == "__main__":
