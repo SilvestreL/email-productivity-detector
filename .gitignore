@@ -155,18 +155,14 @@ docker-compose.override.yml
 models/*/checkpoint-*/
 models/test-model/
 
-# Exclude heavy model files from GitHub (will be downloaded during build)
-models/*/model.safetensors
-models/*/vocab.txt
-models/*/tokenizer.json
-models/*/tokenizer_config.json
-models/*/special_tokens_map.json
-models/*/config.json
-models/*/training_args.bin
-models/*/optimizer.pt
-models/*/scheduler.pt
-models/*/rng_state.pth
-models/*/trainer_state.json
+# Exclude heavy model files from GitHub (will be downloaded from Google Drive)
+models/
+!models/.gitkeep
+
+# Exclude temporary files and model packages
+temp_drive_upload/
+modelo_para_drive.zip
+*.zip
 
 # Data files
 data/processed/
