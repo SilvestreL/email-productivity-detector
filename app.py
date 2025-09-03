@@ -550,8 +550,7 @@ class SmartEmailClassifier:
         return "Mensagem recebida. Obrigado pelo contato."
 
 
-# Instanciar classificador inteligente
-smart_classifier = SmartEmailClassifier()
+# Modelo BERT para classificação de emails
 
 
 # Cache do modelo para evitar recarga
@@ -599,30 +598,36 @@ except Exception as e:
 
 def preprocess(text: str) -> str:
     """
-    Pré-processamento NLP para português brasileiro
+    Pré-processamento NLP avançado para português brasileiro
 
     Args:
         text: Texto a ser processado
 
     Returns:
-        Texto processado
+        Texto processado e otimizado para classificação
     """
     if not text:
         return ""
 
-    # Normalizar espaços
+    # Normalizar espaços e caracteres especiais
     text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^\w\s]", " ", text)  # Remove pontuação
 
-    # Tokenização simples por palavras
-    tokens = re.findall(r"\w+|\S", text, flags=re.UNICODE)
+    # Converter para minúsculas para consistência
+    text = text.lower()
 
-    # Remover stopwords (case-insensitive)
-    tokens = [t for t in tokens if t.lower() not in STOP_PT]
+    # Tokenização por palavras
+    tokens = re.findall(r"\b\w+\b", text, flags=re.UNICODE)
 
-    # Opcional: stemming leve com RSLP
-    # from nltk.stem import RSLPStemmer
-    # stemmer = RSLPStemmer()
-    # tokens = [stemmer.stem(t) if t.isalpha() else t for t in tokens]
+    # Remover stopwords em português
+    tokens = [t for t in tokens if t.lower() not in STOP_PT and len(t) > 2]
+
+    # Remover números isolados (mantém apenas palavras)
+    tokens = [t for t in tokens if not t.isdigit()]
+
+    # Limitar tamanho para evitar textos muito longos
+    if len(tokens) > 100:
+        tokens = tokens[:100]
 
     return " ".join(tokens)
 
@@ -668,7 +673,7 @@ def read_uploaded_file(uploaded) -> str:
 
 def classify_email(content: str) -> Dict:
     """
-    Classifica email usando classificador inteligente (BERT + palavras-chave)
+    Classifica email usando modelo BERT fine-tuned
 
     Args:
         content: Conteúdo do email
@@ -688,8 +693,18 @@ def classify_email(content: str) -> Dict:
             "explanation": "Nenhum conteúdo recebido.",
         }
 
-    # Pré-processar texto
-    processed_text = preprocess(text)
+    # Traduzir para inglês se não estiver em inglês
+    try:
+        from deep_translator import GoogleTranslator
+
+        translated_text = GoogleTranslator(source="auto", target="en").translate(text)
+        st.info(f"🌐 Texto traduzido para inglês: {translated_text[:100]}...")
+    except Exception as e:
+        st.warning(f"⚠️ Erro na tradução: {e}. Usando texto original.")
+        translated_text = text
+
+    # Pré-processar texto traduzido
+    processed_text = preprocess(translated_text)
 
     # Carregar classificador BERT
     classifier = get_classifier()
@@ -702,6 +717,7 @@ def classify_email(content: str) -> Dict:
             "explanation": "Erro ao carregar modelo.",
             "processed_text": processed_text,
             "original_text": text,
+            "translated_text": translated_text,
         }
 
     # Classificar com BERT (limitar tamanho do texto)
@@ -718,37 +734,69 @@ def classify_email(content: str) -> Dict:
     bert_category = max(scores, key=scores.get)
     bert_confidence = scores[bert_category]
 
-    # Predição do modelo BERT
-    model_prediction = {"category": bert_category, "confidence": bert_confidence}
+    # Garantir que a categoria seja apenas "Produtivo" ou "Improdutivo"
+    if bert_category not in ["Produtivo", "Improdutivo"]:
+        # Mapear para a categoria mais próxima baseado no contexto
+        if any(
+            word in bert_category.lower()
+            for word in [
+                "produtivo",
+                "productive",
+                "work",
+                "business",
+                "urgent",
+                "action",
+                "project",
+            ]
+        ):
+            bert_category = "Produtivo"
+        else:
+            bert_category = "Improdutivo"
 
-    # Usar classificador inteligente para correção
-    smart_result = smart_classifier.smart_classify(text, model_prediction)
+    # Validação adicional de confiança
+    if bert_confidence < 0.6:
+        # Se confiança baixa, usar análise de palavras-chave como fallback
+        if any(
+            word in text.lower()
+            for word in ["reunião", "projeto", "urgente", "problema", "deadline"]
+        ):
+            bert_category = "Produtivo"
+            bert_confidence = max(bert_confidence, 0.7)
+        elif any(
+            word in text.lower()
+            for word in ["oi", "olá", "bom dia", "parabéns", "obrigado"]
+        ):
+            bert_category = "Improdutivo"
+            bert_confidence = max(bert_confidence, 0.7)
 
-    # Determinar categoria final
-    final_category = smart_result["category"]
-    final_confidence = smart_result["confidence"]
-    method_used = smart_result["method"]
-    correction_applied = smart_result["correction_applied"]
-
-    # Gerar explicação inteligente
-    if correction_applied:
-        explanation = f"Classificação inteligente: {final_category} (corrigido de {bert_category}) com {final_confidence:.2%}."
+    # Gerar explicação detalhada
+    if bert_confidence >= 0.8:
+        confidence_level = "alta"
+    elif bert_confidence >= 0.6:
+        confidence_level = "média"
     else:
-        explanation = (
-            f"Modelo BERT classificou como {final_category} com {final_confidence:.2%}."
-        )
+        confidence_level = "baixa"
+
+    explanation = f"Modelo BERT classificou como {bert_category} com confiança {confidence_level} ({bert_confidence:.1%})."
+
+    # Adicionar contexto baseado no tipo de email
+    if bert_category == "Produtivo":
+        explanation += " Este email requer atenção e ação da nossa equipe."
+    else:
+        explanation += " Este email não requer ação específica da nossa equipe."
 
     return {
-        "category": final_category,
-        "confidence": final_confidence,
+        "category": bert_category,
+        "confidence": bert_confidence,
         "scores": scores,
         "explanation": explanation,
         "processed_text": processed_text,
         "original_text": text,
-        "method": method_used,
-        "correction_applied": correction_applied,
+        "translated_text": translated_text,
+        "method": "BERT",
+        "correction_applied": False,
         "bert_prediction": bert_category,
-        "smart_category": final_category,
+        "smart_category": bert_category,
     }
 
 
@@ -768,22 +816,15 @@ def suggest_reply(
         Tuple com (reply, confidence, reasoning)
     """
 
-    # Se temos informações de classificação inteligente, usar o classificador
-    if classification_info and hasattr(smart_classifier, "get_smart_response"):
-        try:
-            reply = smart_classifier.get_smart_response(classification_info, tone)
-            confidence = 0.95
-            reasoning = f"Resposta inteligente para categoria '{category}' com tom {tone} - gerada automaticamente."
-            return reply, confidence, reasoning
-        except Exception as e:
-            st.warning(f"Erro ao gerar resposta inteligente: {e}")
-            # Continuar com templates tradicionais
+    # Usar templates baseados na categoria e tom selecionado
 
     # Templates tradicionais para compatibilidade
     produtivo_templates = {
         "profissional": """Prezado(a),
 
-Obrigado(a) pelo seu contato. Recebemos sua mensagem e confirmamos que requer nossa atenção.
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e confirmamos que **requer nossa atenção e ação**.
+
+Esta comunicação foi classificada como produtiva para nossas operações.
 
 Para dar continuidade, precisamos de algumas informações:
 - Qual o prazo esperado para esta demanda?
@@ -796,7 +837,9 @@ Equipe de Atendimento""",
 
 Obrigado pelo contato! 😊 
 
-Recebemos sua mensagem e vamos dar a atenção necessária.
+Recebemos sua mensagem e confirmamos que **requer nossa atenção e ação**.
+
+Esta comunicação foi classificada como produtiva para nossas operações.
 
 Para organizarmos melhor, você poderia me informar:
 - Qual o prazo que você tem em mente?
@@ -809,6 +852,8 @@ Abraços!""",
         "formal": """Exmo(a). Sr(a).,
 
 Agradecemos o contato e informamos que sua comunicação foi recebida e está sendo processada.
+
+Esta comunicação foi classificada como produtiva para nossas operações.
 
 Para prosseguirmos adequadamente, solicitamos as seguintes informações:
 - Prazo estimado para conclusão
@@ -824,7 +869,9 @@ Departamento de Atendimento""",
     improdutivo_templates = {
         "profissional": """Prezado(a),
 
-Obrigado(a) pelo seu contato. Recebemos sua mensagem e informamos que não requer ação específica de nossa parte.
+Obrigado(a) pelo seu contato. Recebemos sua mensagem e informamos que **não requer ação específica de nossa equipe**.
+
+Esta comunicação foi classificada como não produtiva para nossas operações.
 
 Agradecemos a comunicação e ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
 
@@ -834,7 +881,9 @@ Equipe de Comunicação""",
 
 Obrigado pelo contato! 😊 
 
-Recebemos sua mensagem e entendemos que não precisa de nenhuma ação nossa no momento.
+Recebemos sua mensagem e informamos que **não precisa de nenhuma ação nossa no momento**.
+
+Esta comunicação foi classificada como não produtiva para nossas operações.
 
 Se precisar de algo específico no futuro, é só falar!
 
@@ -843,7 +892,9 @@ Abraços!""",
 
 Agradecemos o contato e informamos que sua comunicação foi recebida.
 
-Conforme análise, esta mensagem não requer ação específica de nosso departamento no momento.
+Conforme análise, esta mensagem **não requer ação específica de nossa equipe** no momento.
+
+Esta comunicação foi classificada como não produtiva para nossas operações.
 
 Ficamos à disposição para futuras demandas que necessitem de nossa intervenção.
 
@@ -851,15 +902,15 @@ Respeitosamente,
 Departamento de Comunicação""",
     }
 
-    # Selecionar template baseado na categoria
-    if category in ["Produtivo", "solicitacao_acao", "problema_urgencia"]:
+    # Selecionar template baseado na categoria (apenas Produtivo ou Improdutivo)
+    if category == "Produtivo":
         reply = produtivo_templates.get(tone, produtivo_templates["profissional"])
         confidence = 0.90
-        reasoning = f"Resposta automática para email {category} com tom {tone} - solicita confirmação de objetivo/prazo/anexos."
-    else:
+        reasoning = f"Email classificado como Produtivo - solicita confirmação de objetivo/prazo/anexos com tom {tone}."
+    else:  # Improdutivo ou qualquer outra categoria
         reply = improdutivo_templates.get(tone, improdutivo_templates["profissional"])
         confidence = 0.95
-        reasoning = f"Resposta automática para email {category} com tom {tone} - agradece e indica que não requer ação."
+        reasoning = f"Email classificado como Improdutivo - nenhuma ação necessária pela nossa equipe com tom {tone}."
 
     return reply, confidence, reasoning
 
@@ -913,12 +964,87 @@ def main():
 
     st.markdown("---")
 
+    # Exemplos de emails para teste
+    st.markdown("### 📧 Exemplos para Teste")
+    st.markdown(
+        "Clique em um exemplo para inserir automaticamente no campo de conteúdo:"
+    )
+
+    col_ex1, col_ex2, col_ex3 = st.columns(3)
+
+    with col_ex1:
+        if st.button(
+            "📈 Email Produtivo", key="ex_prod", help="Exemplo de email produtivo"
+        ):
+            st.session_state[
+                "example_email"
+            ] = """Olá equipe,
+
+Gostaria de agendar uma reunião para discutir o projeto de implementação do novo sistema de CRM que estávamos planejando.
+
+Temos algumas questões técnicas que precisamos resolver:
+- Integração com o banco de dados existente
+- Cronograma de desenvolvimento
+- Recursos necessários para o projeto
+
+Podemos agendar para esta semana? Preciso definir o orçamento para o próximo trimestre.
+
+Atenciosamente,
+João Silva
+Gerente de Projetos"""
+            st.rerun()
+
+    with col_ex2:
+        if st.button(
+            "📉 Email Improdutivo", key="ex_improd", help="Exemplo de email improdutivo"
+        ):
+            st.session_state[
+                "example_email"
+            ] = """Oi pessoal!
+
+Como estão? Espero que estejam todos bem! 😊
+
+Só passando para dar um oi e ver se vocês viram aquele meme que enviei no grupo do WhatsApp ontem? Muito engraçado, né? 😂
+
+Ah, e não esqueçam que hoje é aniversário da Maria! Parabéns Maria! 🎉🎂🎈
+
+Bom fim de semana para todos!
+Abraços,
+Pedro"""
+            st.rerun()
+
+    with col_ex3:
+        if st.button(
+            "📋 Email Neutro", key="ex_neutro", help="Exemplo de email neutro"
+        ):
+            st.session_state[
+                "example_email"
+            ] = """Bom dia,
+
+Informo que estarei ausente do escritório amanhã devido a um compromisso médico.
+
+Minhas atividades estão organizadas e não há pendências urgentes.
+
+Retorno na quinta-feira.
+
+Atenciosamente,
+Ana Costa
+Assistente Administrativa"""
+            st.rerun()
+
+    st.markdown("---")
+
     # Inputs
     col1, col2 = st.columns([2, 1])
 
     with col1:
+        # Inicializar exemplo de email se não existir
+        if "example_email" not in st.session_state:
+            st.session_state["example_email"] = ""
+
         content = st.text_area(
             "Conteúdo do Email",
+            value=st.session_state["example_email"],
             height=250,
             placeholder="Digite o conteúdo do email aqui...",
             help="Conteúdo completo do email",
@@ -930,6 +1056,13 @@ def main():
             type=["txt", "pdf"],
             help="Envie um arquivo .txt ou .pdf para análise",
         )
+
+        # Botão para limpar exemplo
+        if st.button(
+            "🗑️ Limpar Exemplo", key="clear_example", help="Limpa o campo de conteúdo"
+        ):
+            st.session_state["example_email"] = ""
+            st.rerun()
 
     with col2:
         tone = st.selectbox(
@@ -976,29 +1109,55 @@ def main():
             st.warning("Por favor, digite o conteúdo do email ou envie um arquivo.")
             return
 
-        # Medir tempo de inferência
-        start_time = time.perf_counter()
-
-        # Classificar email
-        with st.spinner("Classificando email..."):
-            classification = classify_email(final_content)
-
-        # Medir tempo
-        inference_time = (time.perf_counter() - start_time) * 1000  # ms
-
-        # Gerar resposta sugerida
-        with st.spinner("Gerando resposta..."):
-            reply, reply_confidence, reasoning = suggest_reply(
-                classification["category"], tone, final_content, classification
+        # Validação de tamanho do texto
+        if len(final_content) < 10:
+            st.warning(
+                "O texto é muito curto para uma classificação precisa. Digite pelo menos 10 caracteres."
             )
+            return
+
+        if len(final_content) > 10000:
+            st.warning(
+                "O texto é muito longo. Para melhor performance, limite a 10.000 caracteres."
+            )
+            final_content = final_content[:10000]
+
+            # Medir tempo de inferência
+    start_time = time.perf_counter()
+
+    # Classificar email
+    with st.spinner("Classificando email..."):
+        classification = classify_email(final_content)
+
+    # Medir tempo
+    inference_time = (time.perf_counter() - start_time) * 1000  # ms
+
+    # Log de performance para análise
+    st.info(
+        f"⚡ Performance: Classificação em {inference_time:.0f}ms | Confiança: {classification['confidence']:.1%}"
+    )
+
+    # Gerar resposta sugerida
+    with st.spinner("Gerando resposta..."):
+        reply, reply_confidence, reasoning = suggest_reply(
+            classification["category"], tone, final_content, classification
+        )
 
         st.markdown("---")
 
-        # Resultados em duas colunas
-        col1, col2 = st.columns([1, 1])
+            # Resultados em duas colunas
+    col1, col2 = st.columns([1, 1])
 
-        with col1:
-            st.markdown("### Resumo")
+    with col1:
+        st.markdown("### 📊 Resumo da Classificação")
+        
+        # Status da classificação
+        if classification["confidence"] >= 0.8:
+            st.success("✅ Classificação de Alta Confiança")
+        elif classification["confidence"] >= 0.6:
+            st.warning("⚠️ Classificação de Confiança Média")
+        else:
+            st.error("❌ Classificação de Baixa Confiança")
 
             # Badge da categoria
             category = classification["category"]
@@ -1039,8 +1198,9 @@ def main():
                 st.markdown(
                     f"""
                 <div class="card" style="border-left: 4px solid #2E7D32;">
-                    <h4 style="color: #2E7D32; margin: 0;">PRODUTIVO</h4>
+                    <h4 style="color: #2E7D32; margin: 0;">📈 PRODUTIVO</h4>
                     <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                    <p style="color: #2E7D32; margin: 0.5rem 0 0 0; font-weight: 600;">✅ Requer ação da nossa equipe</p>
                 </div>
                 """,
                     unsafe_allow_html=True,
@@ -1049,8 +1209,9 @@ def main():
                 st.markdown(
                     f"""
                 <div class="card" style="border-left: 4px solid #D32F2F;">
-                    <h4 style="color: #D32F2F; margin: 0;">IMPRODUTIVO</h4>
+                    <h4 style="color: #D32F2F; margin: 0;">📉 IMPRODUTIVO</h4>
                     <p style="color: #5A6A7A; margin: 0.5rem 0 0 0;">Confiança: {confidence:.1%}</p>
+                    <p style="color: #D32F2F; margin: 0.5rem 0 0 0; font-weight: 600;">❌ Nenhuma ação necessária</p>
                 </div>
                 """,
                     unsafe_allow_html=True,

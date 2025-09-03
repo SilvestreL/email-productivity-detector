@@ -6,3 +6,4 @@ pdfminer.six>=20231228
 scikit-learn>=1.4.0
 numpy>=1.26.0
 pandas>=2.2.0
+deep-translator>=1.11.0
