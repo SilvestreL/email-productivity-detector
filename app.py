@@ -323,7 +323,7 @@ h4 {
 .sb-section h4 {
     color: #1e293b;
     font-size: 0.875rem;
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.75rem 0;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -339,31 +339,64 @@ h4 {
 .sb-links {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
     margin-top: 0.75rem;
 }
 
 .sb-link {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 8px;
     color: #475569;
     text-decoration: none;
     transition: all 0.2s ease-in-out;
     font-size: 0.875rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .sb-link:hover {
-    background: #e2e8f0;
+    background: #f8fafc;
     color: #1e293b;
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
 }
 
 .sb-icon {
-    display: inline-flex;
-    width: 16px;
-    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+
+.sb-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: #475569;
+}
+
+.sb-link:hover .sb-icon {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+.sb-link:hover .sb-icon svg {
+    fill: #1e293b;
+}
+
+.sb-label {
+    font-weight: 500;
+    color: inherit;
 }
 
 .sb-divider {
@@ -469,9 +502,9 @@ def render_sidebar():
         st.markdown('<div class="sb-section">', unsafe_allow_html=True)
         st.markdown("<h4>Links</h4>", unsafe_allow_html=True)
 
-        gh_html = f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener" aria-label="GitHub"><span class="sb-icon">{github_svg}</span><span class="sb-label">GitHub</span></a>'
-        li_html = f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener" aria-label="LinkedIn"><span class="sb-icon">{linkedin_svg}</span><span class="sb-label">LinkedIn</span></a>'
-        dc_html = f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener" aria-label="Documentação"><span class="sb-icon">{docs_svg}</span><span class="sb-label">Documentação</span></a>'
+        gh_html = f'<a class="sb-link" href="https://github.com/seu-repo" target="_blank" rel="noopener" aria-label="GitHub"><div class="sb-icon">{github_svg}</div><span class="sb-label">GitHub</span></a>'
+        li_html = f'<a class="sb-link" href="https://www.linkedin.com/in/seu-perfil" target="_blank" rel="noopener" aria-label="LinkedIn"><div class="sb-icon">{linkedin_svg}</div><span class="sb-label">LinkedIn</span></a>'
+        dc_html = f'<a class="sb-link" href="https://seu-dominio/docs" target="_blank" rel="noopener" aria-label="Documentação"><div class="sb-icon">{docs_svg}</div><span class="sb-label">Documentação</span></a>'
 
         st.markdown('<div class="sb-links">', unsafe_allow_html=True)
         st.markdown(gh_html, unsafe_allow_html=True)
