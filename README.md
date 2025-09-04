@@ -79,11 +79,13 @@ docker push registry.hf.space/seu-usuario/seu-space:latest
 ## 🔍 Exemplos
 
 ### Email Produtivo
+
 ```
 "Olá equipe, gostaria de agendar uma reunião para discutir o projeto de implementação do novo sistema de CRM..."
 ```
 
 ### Email Improdutivo
+
 ```
 "Oi pessoal! Como estão? Só passando para dar um oi e ver se vocês viram aquele meme..."
 ```
