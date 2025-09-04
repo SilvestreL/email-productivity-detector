@@ -159,10 +159,21 @@ models/test-model/
 models/
 !models/.gitkeep
 
+# Exclude model directories with heavy files
+email-productivity-classifier/
+hub_ready_model/
+
 # Exclude temporary files and model packages
 temp_drive_upload/
 modelo_para_drive.zip
 *.zip
+
+# Exclude heavy model files
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.joblib
 
 # Data files
 data/processed/
