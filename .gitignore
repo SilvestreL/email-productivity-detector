@@ -203,3 +203,12 @@ metrics/
 !docker-compose.yml
 !nginx.conf
 !deploy.sh
+# Pesos e diretórios pesados
+*.safetensors
+*.pt
+*.pth
+*.bin
+models/
+temp_drive_upload/
+email-productivity-classifier/
+email/
